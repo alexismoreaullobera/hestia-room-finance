@@ -41,7 +41,7 @@ sequenceDiagram
     H->>S: tools/call show_balance
     S-->>H: content (text) + structuredContent {accounts, total}
     H->>S: resources/read ui://finance/balance.html
-    S-->>H: HTML + mimeType text/html;profile=mcp-app + _meta.ui.csp
+    S-->>H: HTML + mimeType text/html#59;profile=mcp-app + _meta.ui.csp
     H->>W: mounts the HTML in a sandboxed iframe, applies the CSP
     W->>H: app.connect() (handshake over postMessage)
     H->>W: tool result
