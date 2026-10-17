@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Hestia.Room.Finance.Mcp/Hestia.Room.Finance.Mcp.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Hestia.Room.Finance.Mcp.Tests/Hestia.Room.Finance.Mcp.Tests.csproj" />
+  </Folder>
 </Solution>
