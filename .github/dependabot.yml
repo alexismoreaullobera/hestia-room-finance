@@ -1,0 +1,44 @@
+version: 2
+
+updates:
+  # NuGet packages of every project (globs: no need to list each project).
+  - package-ecosystem: nuget
+    directories:
+      - /src/*
+      - /tests/*
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "06:00"
+      timezone: Europe/Paris
+    groups:
+      # Minor and patch updates in a single PR; major updates stay separate (breaking changes).
+      nuget-minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: deps
+
+  # .NET SDK pinned in global.json. SDK releases mostly land on Patch Tuesday, hence Wednesday.
+  - package-ecosystem: dotnet-sdk
+    directory: /
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "06:00"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: deps
+
+  # GitHub Actions used by the workflows (updates the pinned SHA and its version comment).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "06:00"
+      timezone: Europe/Paris
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
