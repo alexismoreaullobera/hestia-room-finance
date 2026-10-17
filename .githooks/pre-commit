@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Pre-commit hook: blocks the commit if a secret is found in the staged changes.
+# Enable it once per clone:  git config core.hooksPath .githooks
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks is not installed, commit blocked." >&2
+  echo "  Windows: winget install Gitleaks.Gitleaks" >&2
+  echo "  macOS:   brew install gitleaks" >&2
+  echo "  Linux:   https://github.com/gitleaks/gitleaks/releases" >&2
+  exit 1
+fi
+
+# --staged: only what is about to be committed. --redact: never print the secret itself.
+gitleaks git --pre-commit --staged --redact --no-banner --verbose
