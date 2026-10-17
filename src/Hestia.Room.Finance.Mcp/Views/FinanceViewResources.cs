@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using ModelContextProtocol.Extensions.Apps;
@@ -54,7 +53,7 @@ public static class FinanceViewResources
 
     private static string LoadView(string fileName)
     {
-        var assembly = Assembly.GetExecutingAssembly();
+        var assembly = typeof(FinanceViewResources).Assembly;
         var resourceName = $"{typeof(FinanceViewResources).Namespace}.{fileName}";
 
         using var stream = assembly.GetManifestResourceStream(resourceName)

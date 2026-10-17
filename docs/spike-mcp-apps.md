@@ -81,7 +81,7 @@ Key point: **the widget never talks to the server directly.** The host fetches e
 
 - **Explicit tool registration** (least privilege) instead of `WithToolsFromAssembly()`: a tool is exposed only if it is listed.
 - **`ReadOnly = true`** on `show_balance` (`readOnlyHint` annotation).
-- **`AllowedHosts: localhost`**: protects the local server against DNS rebinding.
+- **`AllowedHosts: localhost`** in `appsettings.Development.json`: protects the local server against DNS rebinding. The real host name will be provided per environment at deployment (#2).
 - **CORS limited to development** and to the configured origins only (`Cors:DevMcpHostOrigins`, currently `http://localhost:8080` for `basic-host`). Never `AllowAnyOrigin`.
 - **Widget renders with `textContent`, never `innerHTML`**: tool data is treated as untrusted (XSS, prompt injection).
 - **Sandboxed rendering**: `basic-host` uses a double iframe (host on :8080, sandbox proxy on :8081, view in `srcdoc`), so the view cannot reach the host DOM or cookies.

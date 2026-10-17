@@ -23,8 +23,7 @@ var devHostOrigins = builder.Configuration.GetSection("Cors:DevMcpHostOrigins").
 builder.Services.AddCors(options => options.AddPolicy(DevHostsCorsPolicy, policy => policy
     .WithOrigins(devHostOrigins)
     .AllowAnyHeader()
-    .AllowAnyMethod()
-    .WithExposedHeaders("Mcp-Session-Id")));
+    .AllowAnyMethod()));
 
 var app = builder.Build();
 

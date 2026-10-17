@@ -46,6 +46,7 @@
 
   <script type="module">
     // The ext-apps App SDK is loaded from unpkg: this domain is declared in the resource CSP (_meta.ui.csp.resourceDomains).
+    // TODO(#2): embed the SDK in the view before production (no third-party code at runtime, no external CSP domain).
     import { App } from "https://unpkg.com/@modelcontextprotocol/ext-apps@2.0.3/app-with-deps";
 
     const euros = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" });
@@ -74,10 +75,11 @@
     // Handlers must be registered before connecting.
     app.ontoolresult = (result) => {
       const view = result.structuredContent;
-      if (view?.accounts) {
+      if (!result.isError && view?.accounts) {
         render(view);
       } else {
         statusEl.textContent = "Données indisponibles.";
+        statusEl.hidden = false;
       }
     };
     app.onerror = console.error;
