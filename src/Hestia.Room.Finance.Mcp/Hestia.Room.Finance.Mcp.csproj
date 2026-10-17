@@ -14,4 +14,9 @@
     <PackageReference Include="ModelContextProtocol.Extensions.Apps" Version="2.2.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- MCP Apps views (ui:// resources) are embedded in the assembly and served by the MCP server. -->
+    <EmbeddedResource Include="Views\*.html" />
+  </ItemGroup>
+
 </Project>
