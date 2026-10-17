@@ -16,7 +16,7 @@ builder.Services.AddMcpServer()
     .WithResources(FinanceViewResources.Create())
     .WithMcpApps();
 
-// Browser-based MCP hosts (ext-apps basic-host) call the server cross-origin.
+// Browser-based MCP hosts calling the server directly (e.g. the future Hestia shell) need CORS.
 // Development only, restricted to the allowed local origins from configuration.
 const string DevHostsCorsPolicy = "DevMcpHosts";
 var devHostOrigins = builder.Configuration.GetSection("Cors:DevMcpHostOrigins").Get<string[]>() ?? [];
