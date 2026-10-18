@@ -14,6 +14,7 @@ namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 public class McpEndpointTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
 {
     private const string BalanceViewUri = "ui://finance/balance.html";
+    private const int RequestId = 1;
 
     [Fact]
     public async Task ToolsList_ExposesShowBalanceLinkedToItsView()
@@ -57,14 +58,17 @@ public class McpEndpointTests(WebApplicationFactory<Program> factory) : IClassFi
         response.EnsureSuccessStatusCode();
 
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        var message = JsonNode.Parse(ReadJsonRpcPayload(body))!;
+        // Streamable HTTP: the Content-Type tells whether the answer is plain JSON or an SSE stream.
+        var message = response.Content.Headers.ContentType?.MediaType == "text/event-stream"
+            ? FindResponseInSseStream(body, RequestId)
+            : JsonNode.Parse(body)!;
         Assert.Null(message["error"]);
         return message["result"]!;
     }
 
     private static HttpRequestMessage CreateRequest(string method, JsonObject? parameters = null)
     {
-        var payload = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = 1, ["method"] = method };
+        var payload = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = RequestId, ["method"] = method };
         if (parameters is not null)
         {
             payload["params"] = parameters;
@@ -81,20 +85,28 @@ public class McpEndpointTests(WebApplicationFactory<Program> factory) : IClassFi
     }
 
     /// <summary>
-    /// The server answers either with plain JSON or with an SSE stream ("data: {...}" lines).
+    /// Finds the JSON-RPC response matching <paramref name="requestId"/> in an SSE stream.
+    /// The stream may also carry other messages (e.g. progress notifications), so the response
+    /// is identified by its id, as JSON-RPC intends.
     /// </summary>
-    private static string ReadJsonRpcPayload(string body)
+    private static JsonNode FindResponseInSseStream(string body, int requestId)
     {
-        if (!body.TrimStart().StartsWith("event:", StringComparison.Ordinal)
-            && !body.TrimStart().StartsWith("data:", StringComparison.Ordinal))
+        // SSE: events are separated by a blank line; an event's data is the concatenation of its "data:" lines.
+        var events = body.ReplaceLineEndings("\n").Split("\n\n", StringSplitOptions.RemoveEmptyEntries);
+        foreach (var sseEvent in events)
         {
-            return body;
+            var data = string.Join('\n', sseEvent
+                .Split('\n')
+                .Where(line => line.StartsWith("data:", StringComparison.Ordinal))
+                .Select(line => line["data:".Length..])
+                .Select(value => value.StartsWith(' ') ? value[1..] : value));
+
+            if (data.Length > 0 && JsonNode.Parse(data) is { } message && (int?)message["id"] == requestId)
+            {
+                return message;
+            }
         }
 
-        return body
-            .Split('\n')
-            .Select(line => line.TrimEnd('\r'))
-            .Last(line => line.StartsWith("data:", StringComparison.Ordinal))["data:".Length..]
-            .Trim();
+        throw new InvalidOperationException($"No JSON-RPC response with id {requestId} in the SSE stream:\n{body}");
     }
 }
