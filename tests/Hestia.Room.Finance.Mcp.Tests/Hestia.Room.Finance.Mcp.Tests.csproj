@@ -7,6 +7,8 @@
     <!-- Microsoft Testing Platform: the test project is a standalone executable (see test.runner in global.json). -->
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
+    <!-- packages.lock.json: exact versions and content hashes of all dependencies (direct and transitive). -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>
