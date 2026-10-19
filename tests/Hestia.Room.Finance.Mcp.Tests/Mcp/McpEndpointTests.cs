@@ -26,6 +26,28 @@ public class McpEndpointTests(DevelopmentMcpServerFactory factory) : IClassFixtu
     }
 
     [Fact]
+    public async Task ToolsList_ShowBalance_IsAnnouncedAsReadOnly()
+    {
+        // Hosts and agents rely on readOnlyHint to call a tool without asking for confirmation.
+        var result = await SendAsync("tools/list");
+
+        var tool = result["tools"]!.AsArray().Single(t => (string?)t!["name"] == "show_balance")!;
+        Assert.True((bool?)tool["annotations"]?["readOnlyHint"]);
+    }
+
+    [Fact]
+    public async Task ResourcesList_BalanceView_DeclaresItsCsp()
+    {
+        // Same pitfall as resources/read: some hosts read the CSP from the resource list.
+        var result = await SendAsync("resources/list");
+
+        var view = result["resources"]!.AsArray().Single(r => (string?)r!["uri"] == BalanceViewUri)!;
+        var resourceDomains = view["_meta"]?["ui"]?["csp"]?["resourceDomains"]?.AsArray();
+        Assert.NotNull(resourceDomains);
+        Assert.Contains("https://unpkg.com", resourceDomains.Select(d => (string?)d));
+    }
+
+    [Fact]
     public async Task ResourcesRead_BalanceView_ReturnsMcpAppHtmlWithCsp()
     {
         // Pitfall: McpApps.SetResourceUi did not publish the CSP for a direct resource.
