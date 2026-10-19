@@ -39,6 +39,6 @@ public class FinanceViewToolsTests
     {
         var result = FinanceViewTools.ShowBalance();
 
-        Assert.NotEqual(true, result.IsError);
+        Assert.False(result.IsError ?? false);
     }
 }

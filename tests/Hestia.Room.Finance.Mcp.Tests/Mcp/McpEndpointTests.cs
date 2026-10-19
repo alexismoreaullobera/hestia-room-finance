@@ -12,8 +12,12 @@ namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 /// </summary>
 public class McpEndpointTests(DevelopmentMcpServerFactory factory) : IClassFixture<DevelopmentMcpServerFactory>
 {
+    // Written as a literal on purpose (not FinanceViewResources.BalanceViewUri): this URI is a public
+    // contract read by the hosts, so renaming it in the code must break these tests.
     private const string BalanceViewUri = "ui://finance/balance.html";
     private const int RequestId = 1;
+
+    private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
     public async Task ToolsList_ExposesShowBalanceLinkedToItsView()
@@ -55,9 +59,10 @@ public class McpEndpointTests(DevelopmentMcpServerFactory factory) : IClassFixtu
 
         var contents = Assert.Single(result["contents"]!.AsArray())!;
         Assert.Equal("text/html;profile=mcp-app", (string?)contents["mimeType"]);
-        Assert.StartsWith("<!doctype html>", (string?)contents["text"]);
+        Assert.StartsWith("<!doctype html>", (string?)contents["text"], StringComparison.OrdinalIgnoreCase);
         var resourceDomains = contents["_meta"]?["ui"]?["csp"]?["resourceDomains"]?.AsArray();
-        Assert.Contains("https://unpkg.com", resourceDomains!.Select(d => (string?)d));
+        Assert.NotNull(resourceDomains);
+        Assert.Contains("https://unpkg.com", resourceDomains.Select(d => (string?)d));
     }
 
     [Fact]
@@ -67,7 +72,7 @@ public class McpEndpointTests(DevelopmentMcpServerFactory factory) : IClassFixtu
         using var request = CreateRequest("tools/list");
         request.Headers.Host = "evil.example";
 
-        using var response = await factory.CreateClient().SendAsync(request, TestContext.Current.CancellationToken);
+        using var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -75,7 +80,7 @@ public class McpEndpointTests(DevelopmentMcpServerFactory factory) : IClassFixtu
     private async Task<JsonNode> SendAsync(string method, JsonObject? parameters = null)
     {
         using var request = CreateRequest(method, parameters);
-        using var response = await factory.CreateClient().SendAsync(request, TestContext.Current.CancellationToken);
+        using var response = await _client.SendAsync(request, TestContext.Current.CancellationToken);
         response.EnsureSuccessStatusCode();
 
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
@@ -83,7 +88,7 @@ public class McpEndpointTests(DevelopmentMcpServerFactory factory) : IClassFixtu
         var message = response.Content.Headers.ContentType?.MediaType == "text/event-stream"
             ? FindResponseInSseStream(body, RequestId)
             : JsonNode.Parse(body)!;
-        Assert.Null(message["error"]);
+        Assert.True(message["error"] is null, $"JSON-RPC error: {message["error"]?.ToJsonString()}");
         return message["result"]!;
     }
 
