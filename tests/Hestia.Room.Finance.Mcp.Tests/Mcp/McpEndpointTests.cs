@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 
@@ -11,7 +10,7 @@ namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 /// End-to-end tests of the /mcp endpoint (in-memory server, real HTTP pipeline).
 /// They lock the pitfalls found during the T1 spike (docs/spike-mcp-apps.md).
 /// </summary>
-public class McpEndpointTests(WebApplicationFactory<Program> factory) : IClassFixture<WebApplicationFactory<Program>>
+public class McpEndpointTests(DevelopmentMcpServerFactory factory) : IClassFixture<DevelopmentMcpServerFactory>
 {
     private const string BalanceViewUri = "ui://finance/balance.html";
     private const int RequestId = 1;
