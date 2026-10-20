@@ -28,6 +28,18 @@ public sealed class CashFlowForecast
     /// <summary>One end-of-day balance per day of the month, from the 1st to the last day.</summary>
     public IReadOnlyList<DailyBalance> Days { get; }
 
+    /// <summary>Low point (point bas): the lowest end-of-day balance of the month, the earliest day if several.</summary>
+    public DailyBalance LowPoint => Days.MinBy(day => day.Balance)!;
+
+    /// <summary>
+    /// Cash buffer (coussin de trésorerie): the minimum to have on the account at the start of the month so the
+    /// forecast never goes below zero. The need of the month itself: it does not depend on the starting balance.
+    /// </summary>
+    public decimal CashBuffer => Math.Max(0m, StartingBalance - LowPoint.Balance);
+
+    /// <summary>True when the forecast, starting from the starting balance, goes below zero.</summary>
+    public bool HasAlert => LowPoint.Balance < 0m;
+
     /// <summary>
     /// Builds the daily series:
     /// <list type="bullet">
