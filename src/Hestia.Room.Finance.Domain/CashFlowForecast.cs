@@ -41,6 +41,41 @@ public sealed class CashFlowForecast
     public bool HasAlert => LowPoint.Balance < 0m;
 
     /// <summary>
+    /// The recurring expenses that dig the low point, so the user sees which debit to move: the expenses of the
+    /// drawdown, between the last peak before the low point (the highest balance reached before it, the starting
+    /// balance counting as the very first one) and the low point itself. Empty when the month needs no buffer.
+    /// Budgets are not listed: they have no date and weigh evenly every day.
+    /// </summary>
+    public IReadOnlyList<Occurrence> ContributingDebits
+    {
+        get
+        {
+            if (CashBuffer == 0m)
+            {
+                return [];
+            }
+
+            var lowPoint = LowPoint;
+            // Before day 1, the balance is the starting balance. On equal balances, the latest day is kept:
+            // the drawdown starts when the balance leaves its peak for good.
+            var peakDate = Month.FirstDay.AddDays(-1);
+            var peakBalance = StartingBalance;
+            foreach (var day in Days.TakeWhile(day => day.Date < lowPoint.Date))
+            {
+                if (day.Balance >= peakBalance)
+                {
+                    peakBalance = day.Balance;
+                    peakDate = day.Date;
+                }
+            }
+
+            return Occurrences
+                .Where(o => o.Line.Kind == FlowKind.Expense && o.Date > peakDate && o.Date <= lowPoint.Date)
+                .ToList();
+        }
+    }
+
+    /// <summary>
     /// Builds the daily series:
     /// <list type="bullet">
     /// <item>recurring lines on their due date (incomes and expenses of a same day are netted: end-of-day balance);</item>

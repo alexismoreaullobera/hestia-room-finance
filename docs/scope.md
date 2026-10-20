@@ -74,7 +74,7 @@ RecurringOverride
 - **Low point** = minimum of the series, with its date.
 - **Cash buffer** = how far the series goes below zero when starting from 0 € (0 if it never does): the need of the month itself.
 - **Alert** when the series, starting from the starting balance, goes below zero.
-- **Contributing debits**: the expenses between the last income before the low point and the low point, so the user sees which debit to move.
+- **Contributing debits**: the recurring expenses of the **drawdown**, between the last peak before the low point (the highest balance reached before it, the starting balance counting as the very first one) and the low point, so the user sees which debit to move. An income that does not bring the balance back to its peak does not reset the window: the expenses before it still dig the low point. Budgets are not listed (no date).
 
 ## Views (widgets) of the v1
 
