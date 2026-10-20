@@ -111,9 +111,14 @@ Bank connection, transaction-level tracking, several bank accounts, currencies o
 - Reminders through the agent (end-of-month actuals, upcoming end of commitment).
 - Export (JSON / CSV).
 
+## Decisions
+
+1. **The room is a pure MCP server.** It exposes its tools, its `ui://` widgets, its calculations and its storage, nothing else: no standalone UI and no mini host page.
+   - "Useful without AI" is provided by the **Hestia shell in manual navigation** (no agent involved), not by each room embedding its own host.
+   - Until the shell exists, the room is used through any MCP Apps host: the MCP Inspector (development, demo) or Claude Desktop.
+2. **No REST API in the v1.** Every input goes through MCP (input tools with `Visibility = App`), so a REST API would have no consumer. It will be added when a real one appears (native mobile app, automated import, external integration). The Hestia room contract makes the REST API optional.
+
 ## Open questions
 
-1. **Using the room without AI.** Widgets need an MCP Apps host. Recommended: the room serves a **minimal host page** for its own widgets, so every screen is written once (also a rehearsal for the Hestia shell, T5). Alternatives: a separate classic UI calling a REST API (every screen written twice), or no standalone UI in the v1.
-2. **REST API.** If everything goes through MCP (input tools with `Visibility = App`), a REST API has no consumer in the v1: not built for now, and the room contract makes it optional.
-3. **Persistence.** SQLite + EF Core locally; the production database is chosen at deployment.
-4. **The T1 spike.** `show_balance` and `FakeAccounts` are replaced by the v1 tools and a realistic demo data set (several months of plan and actuals).
+1. **Persistence.** SQLite + EF Core locally; the production database is chosen at deployment.
+2. **The T1 spike.** `show_balance` and `FakeAccounts` are replaced by the v1 tools and a realistic demo data set (several months of plan and actuals).
