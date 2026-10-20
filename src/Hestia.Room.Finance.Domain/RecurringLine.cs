@@ -126,4 +126,32 @@ public sealed class RecurringLine
     public SubscriptionInfo? Subscription { get; }
 
     public bool IsSubscription => Subscription is not null;
+
+    /// <summary>
+    /// The occurrence of this line in the given month, or null if it is not due that month.
+    /// A line falls due at most once a month (monthly, quarterly and yearly frequencies).
+    /// </summary>
+    public Occurrence? OccurrenceIn(YearMonth month)
+    {
+        if (!IsDueIn(month.Month))
+        {
+            return null;
+        }
+
+        // Days 29 to 31 fall on the last day of shorter months. Week-ends are ignored: it is a forecast.
+        var date = new DateOnly(month.Year, month.Month, Math.Min(DayOfMonth, month.DaysInMonth));
+
+        var isActive = date >= StartDate && (EndDate is null || date <= EndDate);
+        return isActive ? new Occurrence(this, date) : null;
+    }
+
+    private bool IsDueIn(int month) => Frequency switch
+    {
+        Frequency.Monthly => true,
+        // Due when the gap with the anchor month is a multiple of 3, before or after it in the year
+        // (anchor 11: November, February, May, August). A negative gap works too: -9 % 3 == 0.
+        Frequency.Quarterly => (month - AnchorMonth!.Value) % 3 == 0,
+        Frequency.Yearly => month == AnchorMonth,
+        _ => throw new InvalidOperationException($"Unknown frequency {Frequency}."),
+    };
 }
