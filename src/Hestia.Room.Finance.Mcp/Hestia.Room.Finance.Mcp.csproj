@@ -7,6 +7,8 @@
     <!-- MCP Apps (ModelContextProtocol.Extensions.Apps) is experimental: MCPEXP003 is expected.
     Remove once the API is stable. -->
     <NoWarn>$(NoWarn);MCPEXP003</NoWarn>
+    <!-- packages.lock.json: exact versions and content hashes of all dependencies (direct and transitive). -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
 
   <ItemGroup>
