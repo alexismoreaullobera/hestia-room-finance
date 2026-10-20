@@ -13,6 +13,27 @@ public enum Frequency
     Yearly,
 }
 
+/// <summary>
+/// Fixed list of categories, so that views by category stay reliable.
+/// User-defined categories may replace it later (see docs/scope.md).
+/// </summary>
+public enum Category
+{
+    Other,
+    Income,
+    Housing,
+    Utilities,
+    Telecom,
+    Insurance,
+    Transport,
+    Health,
+    Food,
+    Leisure,
+    Education,
+    Savings,
+    Taxes,
+}
+
 /// <summary>Extra information carried by a subscription (a recurring expense).</summary>
 public sealed record SubscriptionInfo(DateOnly? CommitmentEndDate = null);
 
@@ -32,7 +53,7 @@ public sealed class RecurringLine
         DateOnly startDate,
         int? anchorMonth = null,
         DateOnly? endDate = null,
-        string? category = null,
+        Category category = Category.Other,
         SubscriptionInfo? subscription = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -54,6 +75,11 @@ public sealed class RecurringLine
         if (endDate < startDate)
         {
             throw new ArgumentException("The end date cannot be before the start date.", nameof(endDate));
+        }
+
+        if (!Enum.IsDefined(category))
+        {
+            throw new ArgumentOutOfRangeException(nameof(category), category, "Unknown category.");
         }
 
         if (subscription is not null && kind != FlowKind.Expense)
@@ -95,7 +121,7 @@ public sealed class RecurringLine
 
     public DateOnly? EndDate { get; }
 
-    public string? Category { get; }
+    public Category Category { get; }
 
     public SubscriptionInfo? Subscription { get; }
 

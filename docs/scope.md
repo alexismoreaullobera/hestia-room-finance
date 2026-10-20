@@ -105,6 +105,7 @@ Bank connection, transaction-level tracking, several bank accounts, currencies o
 
 - Real balance tracking day by day (forecast from the actual balance).
 - Subscriptions views by category and by end of commitment.
+- User-defined categories (create, rename, delete) instead of the fixed list of the v1, which keeps an "Other" value.
 - Simulation: "what if I move this debit to the 2nd?".
 - History and trends over several months.
 - Starting balance proposed from the previous month.

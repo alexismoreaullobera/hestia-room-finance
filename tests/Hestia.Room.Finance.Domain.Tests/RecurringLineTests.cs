@@ -9,7 +9,7 @@ public class RecurringLineTests
     {
         var id = Guid.NewGuid();
 
-        var line = new RecurringLine(id, FlowKind.Expense, "Rent", 650m, Frequency.Monthly, dayOfMonth: 5, Start, category: "Housing");
+        var line = new RecurringLine(id, FlowKind.Expense, "Rent", 650m, Frequency.Monthly, dayOfMonth: 5, Start, category: Category.Housing);
 
         Assert.Equal(id, line.Id);
         Assert.Equal(FlowKind.Expense, line.Kind);
@@ -20,7 +20,7 @@ public class RecurringLineTests
         Assert.Equal(Start, line.StartDate);
         Assert.Null(line.AnchorMonth);
         Assert.Null(line.EndDate);
-        Assert.Equal("Housing", line.Category);
+        Assert.Equal(Category.Housing, line.Category);
         Assert.False(line.IsSubscription);
     }
 
@@ -76,6 +76,21 @@ public class RecurringLineTests
         var line = new RecurringLine(Guid.NewGuid(), FlowKind.Expense, "Car insurance", 360m, Frequency.Yearly, 10, Start, anchorMonth: 3);
 
         Assert.Equal(3, line.AnchorMonth);
+    }
+
+    [Fact]
+    public void Constructor_WithoutCategory_IsOther()
+    {
+        Assert.Equal(Category.Other, Monthly().Category);
+    }
+
+    [Fact]
+    public void Constructor_WithAnUndefinedCategory_Throws()
+    {
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new RecurringLine(Guid.NewGuid(), FlowKind.Expense, "Rent", 650m, Frequency.Monthly, 5, Start, category: (Category)999));
+
+        Assert.Equal("category", error.ParamName);
     }
 
     [Fact]
