@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Hestia.Room.Finance.Domain/Hestia.Room.Finance.Domain.csproj" />
     <Project Path="src/Hestia.Room.Finance.Mcp/Hestia.Room.Finance.Mcp.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Hestia.Room.Finance.Domain.Tests/Hestia.Room.Finance.Domain.Tests.csproj" />
     <Project Path="tests/Hestia.Room.Finance.Mcp.Tests/Hestia.Room.Finance.Mcp.Tests.csproj" />
   </Folder>
 </Solution>
