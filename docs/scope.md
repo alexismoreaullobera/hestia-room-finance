@@ -117,8 +117,12 @@ Bank connection, transaction-level tracking, several bank accounts, currencies o
    - "Useful without AI" is provided by the **Hestia shell in manual navigation** (no agent involved), not by each room embedding its own host.
    - Until the shell exists, the room is used through any MCP Apps host: the MCP Inspector (development, demo) or Claude Desktop.
 2. **No REST API in the v1.** Every input goes through MCP (input tools with `Visibility = App`), so a REST API would have no consumer. It will be added when a real one appears (native mobile app, automated import, external integration). The Hestia room contract makes the REST API optional.
+3. **SQL Server end to end, with EF Core.** One engine everywhere, so one set of migrations and no behavior gap between tests and production:
+   - local: SQL Server in a Docker container (`docker compose up`);
+   - integration tests: SQL Server through Testcontainers (a throwaway real database, also in CI);
+   - production: Azure SQL with Microsoft Entra authentication through a managed identity (no key).
+   - Rejected: SQLite, which has no real decimal type (EF Core stores decimals as text and cannot sum or sort them in the database) and is not suited to production on Azure; mixing SQLite locally with Azure SQL in production would mean two sets of migrations and untested production behavior.
 
 ## Open questions
 
-1. **Persistence.** SQLite + EF Core locally; the production database is chosen at deployment.
-2. **The T1 spike.** `show_balance` and `FakeAccounts` are replaced by the v1 tools and a realistic demo data set (several months of plan and actuals).
+1. **The T1 spike.** `show_balance` and `FakeAccounts` are replaced by the v1 tools and a realistic demo data set (several months of plan and actuals).
