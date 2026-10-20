@@ -140,6 +140,13 @@ public sealed class RecurringLine
     };
 
     /// <summary>
+    /// True if the line runs during at least part of the month, whether or not it falls due that month
+    /// (a yearly insurance runs all year long). Used by the smoothed reading of the monthly summary.
+    /// </summary>
+    public bool IsActiveIn(YearMonth month) =>
+        StartDate <= month.LastDay && (EndDate is null || EndDate >= month.FirstDay);
+
+    /// <summary>
     /// The occurrence of this line in the given month, or null if it is not due that month.
     /// A line falls due at most once a month (monthly, quarterly and yearly frequencies).
     /// </summary>
