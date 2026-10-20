@@ -5,11 +5,11 @@
 [![Secrets scan](https://github.com/alexismoreaullobera/hestia-room-finance/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/alexismoreaullobera/hestia-room-finance/actions/workflows/gitleaks.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-The **personal finance room** of Hestia: a personal AI assistant built from standalone "rooms", one per area of life. Each room is a self-contained application that also exposes an **MCP server** (Model Context Protocol): tools an AI agent can call, and **widgets** (MCP Apps) a host can display.
+The **personal finance room** of Hestia: plan the incomes and expenses of each month, forecast the low point of the account, compare plan and actuals, and track subscriptions, with no bank connection. Hestia is a personal AI assistant built from standalone "rooms", one per area of life. Each room is a self-contained application that also exposes an **MCP server** (Model Context Protocol): tools an AI agent can call, and **widgets** (MCP Apps) a host can display.
 
 ![show_balance widget rendered in the MCP Inspector](docs/images/t1-inspector-apps.png)
 
-> **Status: early stage.** The MCP server and its first widget work end to end, with **fake hard-coded data**. Business features (accounts, transactions, CSV import) come next.
+> **Status: early stage.** The MCP server and its first widget work end to end, with **fake hard-coded data**. The v1 features are defined in the [scope](docs/scope.md).
 
 ## Features
 
@@ -78,6 +78,7 @@ Every change goes through a pull request: `main` is protected, and the CI (build
 
 ## Documentation
 
+- [Finance room v1 scope](docs/scope.md): purpose, glossary, data model, calculation rules, views and tools.
 - [Spike T1: MCP Apps in C#](docs/spike-mcp-apps.md): how the widget pipeline works, findings and pitfalls.
 
 ## Security
