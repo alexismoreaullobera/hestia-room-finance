@@ -84,6 +84,8 @@ Every change goes through a pull request: `main` is protected, and the CI (build
 
 This is a local development build: the MCP endpoint has **no authentication yet** and must not be exposed as is. The hardening planned before any deployment is tracked in [#2](https://github.com/alexismoreaullobera/hestia-room-finance/issues/2).
 
+Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md).
+
 ## License
 
 [MIT](LICENSE)
