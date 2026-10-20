@@ -128,6 +128,18 @@ public sealed class RecurringLine
     public bool IsSubscription => Subscription is not null;
 
     /// <summary>
+    /// What the line weighs on one month: a 360 € yearly insurance weighs 30 € per month.
+    /// Not rounded: rounding to the cent is done when displaying, after any sum.
+    /// </summary>
+    public decimal MonthlyEquivalent => Frequency switch
+    {
+        Frequency.Monthly => Amount,
+        Frequency.Quarterly => Amount / 3,
+        Frequency.Yearly => Amount / 12,
+        _ => throw new InvalidOperationException($"Unknown frequency {Frequency}."),
+    };
+
+    /// <summary>
     /// The occurrence of this line in the given month, or null if it is not due that month.
     /// A line falls due at most once a month (monthly, quarterly and yearly frequencies).
     /// </summary>
