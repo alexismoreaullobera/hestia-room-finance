@@ -40,4 +40,59 @@ public sealed record MonthSummary(
             SmoothedIncomes: activeLines.Where(l => l.Kind == FlowKind.Income).Sum(l => l.MonthlyEquivalent),
             SmoothedRecurringExpenses: activeLines.Where(l => l.Kind == FlowKind.Expense).Sum(l => l.MonthlyEquivalent));
     }
+
+    /// <summary>
+    /// The actual summary of a month: the plan corrected by what really happened.
+    /// <list type="bullet">
+    /// <item>A recurring line without override is considered paid as planned.</item>
+    /// <item>A budget without actual is considered spent as planned (the month may not be over yet).</item>
+    /// <item>Actuals and overrides of other months, or of a line not due this month, are ignored.</item>
+    /// </list>
+    /// The smoothed reading stays the planned one: smoothing is a planning view.
+    /// </summary>
+    public static MonthSummary Actual(
+        YearMonth month,
+        IEnumerable<RecurringLine> lines,
+        IEnumerable<Budget> budgets,
+        IEnumerable<BudgetActual> budgetActuals,
+        IEnumerable<RecurringOverride> overrides)
+    {
+        var allLines = lines.ToList();
+        var allBudgets = budgets.ToList();
+        var actualByBudget = UniqueByKey(budgetActuals.Where(a => a.Month == month), a => a.BudgetId, nameof(budgetActuals));
+        var overrideByLine = UniqueByKey(overrides.Where(o => o.Month == month), o => o.LineId, nameof(overrides));
+        var planned = Planned(month, allLines, allBudgets);
+
+        var occurrences = allLines
+            .Select(line => line.OccurrenceIn(month))
+            .OfType<Occurrence>()
+            .Select(o => (o.Line.Kind, Amount: ActualAmountOf(o.Line, overrideByLine)))
+            .ToList();
+
+        return planned with
+        {
+            Incomes = occurrences.Where(o => o.Kind == FlowKind.Income).Sum(o => o.Amount),
+            RecurringExpenses = occurrences.Where(o => o.Kind == FlowKind.Expense).Sum(o => o.Amount),
+            Budgets = allBudgets.Sum(b => actualByBudget.TryGetValue(b.Id, out var actual) ? actual.Amount : b.PlannedAmount),
+        };
+    }
+
+    private static decimal ActualAmountOf(RecurringLine line, Dictionary<Guid, RecurringOverride> overrideByLine) =>
+        overrideByLine.TryGetValue(line.Id, out var correction)
+            ? correction.ActualAmount ?? 0m
+            : line.Amount;
+
+    private static Dictionary<Guid, T> UniqueByKey<T>(IEnumerable<T> items, Func<T, Guid> key, string paramName)
+    {
+        var result = new Dictionary<Guid, T>();
+        foreach (var item in items)
+        {
+            if (!result.TryAdd(key(item), item))
+            {
+                throw new ArgumentException($"Two entries for {key(item)} in the same month.", paramName);
+            }
+        }
+
+        return result;
+    }
 }
