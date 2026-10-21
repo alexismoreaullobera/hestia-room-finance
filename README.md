@@ -9,13 +9,33 @@ The **personal finance room** of Hestia: plan the incomes and expenses of each m
 
 ![show_balance widget rendered in the MCP Inspector](docs/images/t1-inspector-apps.png)
 
-> **Status: early stage.** The MCP server and its first widget work end to end, with **fake hard-coded data**. The v1 features are defined in the [scope](docs/scope.md).
+> **Status: in progress.** The business core is done and tested; persistence (SQL Server, EF Core) is being built. The MCP server still exposes the first spike widget on **fake data**: the real tools come next. The v1 features are defined in the [scope](docs/scope.md).
 
 ## Features
 
-- **`show_balance`** view tool (read-only): a text summary for the model and voice-only hosts, plus structured data for the widget.
-- **`ui://finance/balance.html`** widget (MCP Apps): balances and total, light and dark themes.
-- Streamable HTTP transport (stateless), `.NET 10`.
+**Business core** (`Hestia.Room.Finance.Domain`, pure C#):
+- **Monthly plan**: recurring incomes and expenses (monthly, quarterly, yearly), subscriptions with their end of commitment, budgets for variable expenses.
+- **Month summary**, planned and actual, in two readings: **cash** (what falls due this month) and **smoothed** (a 360 € yearly insurance weighs 30 € every month), with the savings capacity.
+- **Cash flow forecast**: the expected balance of the account day by day, its **low point**, the **cash buffer** the month needs, an **alert** below zero, and the **contributing debits** (which debit to move).
+- Amounts in euros with cents, every object valid once created.
+
+**Persistence** (`Hestia.Room.Finance.Infrastructure`, in progress): SQL Server with EF Core, persistence models separate from the domain.
+
+**MCP server** (`Hestia.Room.Finance.Mcp`): Streamable HTTP (stateless); for now the **`show_balance`** spike tool and its **`ui://finance/balance.html`** widget (MCP Apps), on fake data.
+
+## Architecture
+
+```
+Hestia.Room.Finance.Mcp             MCP server: tools and widgets (ASP.NET Core)
+        │ uses
+Hestia.Room.Finance.Infrastructure  SQL Server through EF Core: persistence rows, conversions
+        │ depends on
+Hestia.Room.Finance.Domain          business rules and calculations, pure C#: no database, no MCP, no clock
+```
+
+- **Dependencies point inward**: the domain depends on nothing; the infrastructure depends on the domain, never the reverse.
+- **Persistence models are separate from the domain**: EF Core maps plain rows (`Rows/`), converted explicitly to domain objects, so storage constraints never leak into the business rules, and an invalid row is rejected on read.
+- **Calculations are done by the code, never by the LLM**: tools compute, the agent explains.
 
 ## Quickstart
 
@@ -42,8 +62,9 @@ The **personal finance room** of Hestia: plan the incomes and expenses of each m
 dotnet test
 ```
 
-- **Unit tests** on the `show_balance` tool (structured data, self-sufficient text summary).
-- **Integration tests** on the `/mcp` endpoint, with an in-memory server: tool and widget metadata (`_meta.ui`), widget MIME type and CSP, host filtering.
+- **Domain**: every calculation rule of the [scope](docs/scope.md), with business-named tests; sensitive rules checked by mutation.
+- **Infrastructure**: domain ↔ row conversions, and the database schema (column types, keys, cascades, check constraints) checked offline from the EF Core model.
+- **MCP server**: unit tests on the `show_balance` tool, and integration tests on the `/mcp` endpoint with an in-memory server (tool and widget metadata, widget MIME type and CSP, host filtering).
 
 Tests use xUnit v3 on the Microsoft Testing Platform (declared in `global.json`).
 
@@ -66,14 +87,15 @@ Every change goes through a pull request: `main` is protected, and the CI (build
 
 ```
 .
-├─ src/Hestia.Room.Finance.Mcp/        MCP server (ASP.NET Core)
-│  ├─ Tools/                           MCP tools
-│  ├─ Views/                           MCP Apps widgets (ui:// resources)
-│  └─ Data/                            fake data (temporary)
-├─ tests/Hestia.Room.Finance.Mcp.Tests/ unit and integration tests
-├─ docs/                               technical notes
-├─ .github/                            CI, CodeQL, secrets scan, Dependabot
-└─ .githooks/                          versioned git hooks
+├─ src/
+│  ├─ Hestia.Room.Finance.Domain/          business rules and calculations
+│  ├─ Hestia.Room.Finance.Infrastructure/  EF Core: DbContext, Configurations/, Rows/
+│  └─ Hestia.Room.Finance.Mcp/             MCP server: Tools/, Views/ (widgets), Data/ (fake data, temporary)
+├─ tests/                                  one test project per project above
+├─ docs/                                   scope and technical notes
+├─ .github/                                CI, CodeQL, secrets scan, Dependabot
+├─ .githooks/                              versioned git hooks
+└─ Directory.Build.props                   settings shared by every project (vulnerable dependencies fail the build)
 ```
 
 ## Documentation
