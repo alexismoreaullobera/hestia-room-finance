@@ -100,5 +100,25 @@ public class FinanceDbContextModelTests
         Assert.Contains($"CONSTRAINT [{constraint}] CHECK", CreateScript);
     }
 
+    [Fact]
+    public void Migrations_AreUpToDateWithTheModel()
+    {
+        // Fails when the configuration changes without a new migration: run `dotnet ef migrations add <Name>`.
+        using var context = OfflineContext();
+
+        Assert.False(context.Database.HasPendingModelChanges());
+    }
+
+    [Fact]
+    public void Migrations_StartWithInitialCreate()
+    {
+        using var context = OfflineContext();
+
+        Assert.EndsWith("_InitialCreate", context.Database.GetMigrations().First());
+    }
+
+    private static FinanceDbContext OfflineContext() =>
+        new(new DbContextOptionsBuilder<FinanceDbContext>().UseSqlServer("Server=offline").Options);
+
     private static IProperty Property(Type rowType, string name) => Model.FindEntityType(rowType)!.FindProperty(name)!;
 }
