@@ -1,8 +1,15 @@
+using static Hestia.Room.Finance.Domain.Tests.TestPlan;
+
 namespace Hestia.Room.Finance.Domain.Tests;
 
 public class OccurrenceTests
 {
-    private static readonly DateOnly LongAgo = new(2020, 1, 1);
+    [Fact]
+    public void OccurrenceIn_DueOnASaturday_StaysOnThatDay()
+    {
+        // April 4th, 2026 is a Saturday: week-ends are ignored, it is a forecast.
+        Assert.Equal(new DateOnly(2026, 4, 4), Line(Frequency.Monthly, day: 4).OccurrenceIn(April)!.Date);
+    }
 
     [Fact]
     public void OccurrenceIn_MonthlyLine_FallsOnItsDay()

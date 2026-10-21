@@ -94,6 +94,32 @@ public class RecurringLineTests
     }
 
     [Fact]
+    public void Constructor_WithAnUndefinedKind_Throws()
+    {
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new RecurringLine(Guid.NewGuid(), (FlowKind)5, "Rent", 650m, Frequency.Monthly, 5, Start));
+
+        Assert.Equal("kind", error.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_WithAnUndefinedFrequency_Throws()
+    {
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new RecurringLine(Guid.NewGuid(), FlowKind.Expense, "Rent", 650m, (Frequency)9, 5, Start, anchorMonth: 3));
+
+        Assert.Equal("frequency", error.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_WithEndDateEqualToStartDate_IsValid()
+    {
+        var line = new RecurringLine(Guid.NewGuid(), FlowKind.Expense, "One-off month", 30m, Frequency.Monthly, 1, Start, endDate: Start);
+
+        Assert.Equal(Start, line.EndDate);
+    }
+
+    [Fact]
     public void Constructor_WithEndDateBeforeStartDate_Throws()
     {
         var error = Assert.Throws<ArgumentException>(() =>

@@ -7,38 +7,39 @@ namespace Hestia.Room.Finance.Domain;
 /// <item><b>Smoothed</b>: with monthly equivalents (a 360 € yearly insurance weighs 30 € every month),
 /// the true savings capacity whatever the month looked at.</item>
 /// </list>
+/// Budgets weigh the same in both readings: they are already monthly.
 /// Amounts are not rounded: rounding is done when displaying.
 /// </summary>
 public sealed record MonthSummary(
     YearMonth Month,
-    decimal Incomes,
-    decimal RecurringExpenses,
-    decimal Budgets,
+    decimal CashIncomes,
+    decimal CashRecurringExpenses,
     decimal SmoothedIncomes,
-    decimal SmoothedRecurringExpenses)
+    decimal SmoothedRecurringExpenses,
+    decimal BudgetsTotal)
 {
     /// <summary>What is left at the end of the month once every expense is paid (can be negative).</summary>
-    public decimal SavingsCapacity => Incomes - RecurringExpenses - Budgets;
+    public decimal CashSavingsCapacity => CashIncomes - CashRecurringExpenses - BudgetsTotal;
 
-    public decimal SmoothedSavingsCapacity => SmoothedIncomes - SmoothedRecurringExpenses - Budgets;
+    public decimal SmoothedSavingsCapacity => SmoothedIncomes - SmoothedRecurringExpenses - BudgetsTotal;
 
-    /// <summary>The planned summary of a month, from the recurring lines and the budgets of the plan.</summary>
+    /// <summary>
+    /// The planned summary of a month, from the recurring lines and the budgets of the plan.
+    /// The caller passes the budgets of the month: a budget no longer used is simply not passed.
+    /// </summary>
     public static MonthSummary Planned(YearMonth month, IEnumerable<RecurringLine> lines, IEnumerable<Budget> budgets)
     {
         var allLines = lines.ToList();
-        var occurrences = allLines
-            .Select(line => line.OccurrenceIn(month))
-            .OfType<Occurrence>()
-            .ToList();
+        var occurrences = allLines.OccurrencesIn(month);
         var activeLines = allLines.Where(line => line.IsActiveIn(month)).ToList();
 
         return new MonthSummary(
             month,
-            Incomes: occurrences.Where(o => o.Line.Kind == FlowKind.Income).Sum(o => o.Line.Amount),
-            RecurringExpenses: occurrences.Where(o => o.Line.Kind == FlowKind.Expense).Sum(o => o.Line.Amount),
-            Budgets: budgets.Sum(budget => budget.PlannedAmount),
+            CashIncomes: occurrences.Where(o => o.Line.Kind == FlowKind.Income).Sum(o => o.Line.Amount),
+            CashRecurringExpenses: occurrences.Where(o => o.Line.Kind == FlowKind.Expense).Sum(o => o.Line.Amount),
             SmoothedIncomes: activeLines.Where(l => l.Kind == FlowKind.Income).Sum(l => l.MonthlyEquivalent),
-            SmoothedRecurringExpenses: activeLines.Where(l => l.Kind == FlowKind.Expense).Sum(l => l.MonthlyEquivalent));
+            SmoothedRecurringExpenses: activeLines.Where(l => l.Kind == FlowKind.Expense).Sum(l => l.MonthlyEquivalent),
+            BudgetsTotal: budgets.Sum(budget => budget.PlannedAmount));
     }
 
     /// <summary>
@@ -61,19 +62,17 @@ public sealed record MonthSummary(
         var allBudgets = budgets.ToList();
         var actualByBudget = UniqueByKey(budgetActuals.Where(a => a.Month == month), a => a.BudgetId, nameof(budgetActuals));
         var overrideByLine = UniqueByKey(overrides.Where(o => o.Month == month), o => o.LineId, nameof(overrides));
-        var planned = Planned(month, allLines, allBudgets);
 
         var occurrences = allLines
-            .Select(line => line.OccurrenceIn(month))
-            .OfType<Occurrence>()
+            .OccurrencesIn(month)
             .Select(o => (o.Line.Kind, Amount: ActualAmountOf(o.Line, overrideByLine)))
             .ToList();
 
-        return planned with
+        return Planned(month, allLines, allBudgets) with
         {
-            Incomes = occurrences.Where(o => o.Kind == FlowKind.Income).Sum(o => o.Amount),
-            RecurringExpenses = occurrences.Where(o => o.Kind == FlowKind.Expense).Sum(o => o.Amount),
-            Budgets = allBudgets.Sum(b => actualByBudget.TryGetValue(b.Id, out var actual) ? actual.Amount : b.PlannedAmount),
+            CashIncomes = occurrences.Where(o => o.Kind == FlowKind.Income).Sum(o => o.Amount),
+            CashRecurringExpenses = occurrences.Where(o => o.Kind == FlowKind.Expense).Sum(o => o.Amount),
+            BudgetsTotal = allBudgets.Sum(b => actualByBudget.TryGetValue(b.Id, out var actual) ? actual.Amount : b.PlannedAmount),
         };
     }
 

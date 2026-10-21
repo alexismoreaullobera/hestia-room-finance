@@ -1,41 +1,6 @@
+using System.Runtime.CompilerServices;
+
 namespace Hestia.Room.Finance.Domain;
-
-public enum FlowKind
-{
-    Income,
-    Expense,
-}
-
-public enum Frequency
-{
-    Monthly,
-    Quarterly,
-    Yearly,
-}
-
-/// <summary>
-/// Fixed list of categories, so that views by category stay reliable.
-/// User-defined categories may replace it later (see docs/scope.md).
-/// </summary>
-public enum Category
-{
-    Other,
-    Income,
-    Housing,
-    Utilities,
-    Telecom,
-    Insurance,
-    Transport,
-    Health,
-    Food,
-    Leisure,
-    Education,
-    Savings,
-    Taxes,
-}
-
-/// <summary>Extra information carried by a subscription (a recurring expense).</summary>
-public sealed record SubscriptionInfo(DateOnly? CommitmentEndDate = null);
 
 /// <summary>
 /// An income or an expense that repeats: salary, unemployment benefit, rent, insurance, subscription.
@@ -56,6 +21,10 @@ public sealed class RecurringLine
         Category category = Category.Other,
         SubscriptionInfo? subscription = null)
     {
+        // Enums are checked too: any int can be cast to an enum (from storage, or from a tool called by an LLM).
+        ThrowIfUndefined(kind);
+        ThrowIfUndefined(frequency);
+        ThrowIfUndefined(category);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         // The sign comes from the kind: an amount is always positive.
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amount);
@@ -75,11 +44,6 @@ public sealed class RecurringLine
         if (endDate < startDate)
         {
             throw new ArgumentException("The end date cannot be before the start date.", nameof(endDate));
-        }
-
-        if (!Enum.IsDefined(category))
-        {
-            throw new ArgumentOutOfRangeException(nameof(category), category, "Unknown category.");
         }
 
         if (subscription is not null && kind != FlowKind.Expense)
@@ -162,6 +126,15 @@ public sealed class RecurringLine
 
         var isActive = date >= StartDate && (EndDate is null || date <= EndDate);
         return isActive ? new Occurrence(this, date) : null;
+    }
+
+    private static void ThrowIfUndefined<TEnum>(TEnum value, [CallerArgumentExpression(nameof(value))] string? paramName = null)
+        where TEnum : struct, Enum
+    {
+        if (!Enum.IsDefined(value))
+        {
+            throw new ArgumentOutOfRangeException(paramName, value, $"Unknown {typeof(TEnum).Name}.");
+        }
     }
 
     private bool IsDueIn(int month) => Frequency switch

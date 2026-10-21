@@ -1,22 +1,20 @@
+using static Hestia.Room.Finance.Domain.Tests.TestPlan;
+
 namespace Hestia.Room.Finance.Domain.Tests;
 
 public class MonthSummaryActualTests
 {
-    private static readonly YearMonth April = new(2026, 4);
     private static readonly YearMonth May = new(2026, 5);
-    private static readonly DateOnly LongAgo = new(2020, 1, 1);
 
-    private readonly RecurringLine _salary = Monthly(FlowKind.Income, "Salary", 2000m, day: 28);
-    private readonly RecurringLine _rent = Monthly(FlowKind.Expense, "Rent", 650m, day: 5);
-    private readonly RecurringLine _water = Monthly(FlowKind.Expense, "Water", 45m, day: 15);
-    private readonly Budget _groceries = new(Guid.NewGuid(), "Groceries", 200m);
+    private readonly RecurringLine _salary = Income("Salary", 2000m, day: 28);
+    private readonly RecurringLine _rent = Expense("Rent", 650m, day: 5);
+    private readonly RecurringLine _water = Expense("Water", 45m, day: 15);
+    private readonly Budget _groceries = NewBudget("Groceries", 200m);
 
     [Fact]
     public void Actual_WithoutAnyActualOrOverride_EqualsThePlan()
     {
-        var actual = Actual([], []);
-
-        Assert.Equal(Planned(), actual);
+        Assert.Equal(Planned(), Actual([], []));
     }
 
     [Fact]
@@ -24,8 +22,8 @@ public class MonthSummaryActualTests
     {
         var actual = Actual([new BudgetActual(_groceries.Id, April, 235m)], []);
 
-        Assert.Equal(235m, actual.Budgets);
-        Assert.Equal(2000m - 695m - 235m, actual.SavingsCapacity);
+        Assert.Equal(235m, actual.BudgetsTotal);
+        Assert.Equal(2000m - 695m - 235m, actual.CashSavingsCapacity);
     }
 
     [Fact]
@@ -33,23 +31,39 @@ public class MonthSummaryActualTests
     {
         var actual = Actual([new BudgetActual(_groceries.Id, April, 0m)], []);
 
-        Assert.Equal(0m, actual.Budgets);
+        Assert.Equal(0m, actual.BudgetsTotal);
     }
 
     [Fact]
-    public void Actual_OverrideWithAmount_ReplacesTheAmountOfTheLine()
+    public void Actual_OverrideWithAmountOnAnExpense_ReplacesItsAmount()
     {
         var actual = Actual([], [RecurringOverride.WithAmount(_water.Id, April, 52m)]);
 
-        Assert.Equal(650m + 52m, actual.RecurringExpenses);
+        Assert.Equal(650m + 52m, actual.CashRecurringExpenses);
     }
 
     [Fact]
-    public void Actual_SkippedLine_CountsForNothing()
+    public void Actual_OverrideWithAmountOnAnIncome_ReplacesItsAmount()
+    {
+        var actual = Actual([], [RecurringOverride.WithAmount(_salary.Id, April, 2100m)]);
+
+        Assert.Equal(2100m, actual.CashIncomes);
+    }
+
+    [Fact]
+    public void Actual_SkippedIncome_CountsForNothing()
     {
         var actual = Actual([], [RecurringOverride.Skipped(_salary.Id, April)]);
 
-        Assert.Equal(0m, actual.Incomes);
+        Assert.Equal(0m, actual.CashIncomes);
+    }
+
+    [Fact]
+    public void Actual_SkippedExpense_CountsForNothing()
+    {
+        var actual = Actual([], [RecurringOverride.Skipped(_rent.Id, April)]);
+
+        Assert.Equal(45m, actual.CashRecurringExpenses);
     }
 
     [Fact]
@@ -63,13 +77,22 @@ public class MonthSummaryActualTests
     }
 
     [Fact]
+    public void Actual_OverridesOfTheSameLineInTwoMonths_AreNotDuplicates()
+    {
+        var actual = Actual([],
+            [RecurringOverride.WithAmount(_water.Id, April, 52m), RecurringOverride.WithAmount(_water.Id, May, 60m)]);
+
+        Assert.Equal(650m + 52m, actual.CashRecurringExpenses);
+    }
+
+    [Fact]
     public void Actual_OverrideOfALineNotDueThisMonth_IsIgnored()
     {
-        var insurance = new RecurringLine(Guid.NewGuid(), FlowKind.Expense, "Car insurance", 360m, Frequency.Yearly, 10, LongAgo, anchorMonth: 3);
+        var insurance = YearlyExpense("Car insurance", 360m, day: 10, anchorMonth: 3);
 
         var actual = MonthSummary.Actual(April, [insurance], [], [], [RecurringOverride.WithAmount(insurance.Id, April, 400m)]);
 
-        Assert.Equal(0m, actual.RecurringExpenses);
+        Assert.Equal(0m, actual.CashRecurringExpenses);
     }
 
     [Fact]
@@ -107,7 +130,7 @@ public class MonthSummaryActualTests
     [Theory]
     [InlineData(0)]
     [InlineData(-5)]
-    public void RecurringOverride_WithAmountNotPositive_Throws(decimal amount)
+    public void RecurringOverride_WithAmountNotPositive_Throws(int amount)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => RecurringOverride.WithAmount(_water.Id, April, amount));
     }
@@ -125,7 +148,4 @@ public class MonthSummaryActualTests
 
     private MonthSummary Actual(BudgetActual[] budgetActuals, RecurringOverride[] overrides) =>
         MonthSummary.Actual(April, [_salary, _rent, _water], [_groceries], budgetActuals, overrides);
-
-    private static RecurringLine Monthly(FlowKind kind, string name, decimal amount, int day) =>
-        new(Guid.NewGuid(), kind, name, amount, Frequency.Monthly, day, LongAgo);
 }

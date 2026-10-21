@@ -1,19 +1,14 @@
+using static Hestia.Room.Finance.Domain.Tests.TestPlan;
+
 namespace Hestia.Room.Finance.Domain.Tests;
 
 public class LowPointTests
 {
-    private static readonly YearMonth April = new(2026, 4);
-    private static readonly DateOnly LongAgo = new(2020, 1, 1);
-
-    // Rent on the 5th, salary on the 28th: the account goes down until the 27th.
-    private static readonly RecurringLine[] Plan =
-    [
-        Monthly(FlowKind.Expense, 650m, day: 5),
-        Monthly(FlowKind.Income, 2000m, day: 28),
-    ];
+    // Rent on the 5th, salary on the 28th: the account goes down to -650 € from the 5th to the 27th.
+    private static readonly RecurringLine[] Plan = [Expense("Rent", 650m, day: 5), Income("Salary", 2000m, day: 28)];
 
     [Fact]
-    public void LowPoint_IsTheLowestEndOfDayBalanceWithItsDate()
+    public void LowPoint_IsTheLowestEndOfDayBalance_OnTheEarliestDayIfSeveral()
     {
         var forecast = CashFlowForecast.Compute(April, 0m, Plan, []);
 
@@ -21,37 +16,29 @@ public class LowPointTests
     }
 
     [Fact]
-    public void LowPoint_OnSeveralDaysAtTheSameBalance_IsTheEarliestDay()
-    {
-        // The balance stays at -650 € from the 5th to the 27th.
-        var forecast = CashFlowForecast.Compute(April, 0m, Plan, []);
-
-        Assert.Equal(new DateOnly(2026, 4, 5), forecast.LowPoint.Date);
-    }
-
-    [Fact]
     public void LowPoint_WithBudgets_IsTheDayBeforeTheIncome()
     {
         // Groceries spread every day: the balance keeps going down until the salary on the 28th.
-        var forecast = CashFlowForecast.Compute(April, 0m, Plan, [new Budget(Guid.NewGuid(), "Groceries", 300m)]);
+        var forecast = CashFlowForecast.Compute(April, 0m, Plan, [NewBudget("Groceries", 300m)]);
 
         Assert.Equal(new DateOnly(2026, 4, 27), forecast.LowPoint.Date);
         Assert.Equal(-650m - (27 * 10m), forecast.LowPoint.Balance);
     }
 
     [Fact]
-    public void CashBuffer_IsHowFarTheForecastGoesBelowZeroFromZero()
+    public void LowPoint_CanBeTheFirstDayOfTheMonth()
     {
-        var forecast = CashFlowForecast.Compute(April, 0m, Plan, []);
+        var forecast = CashFlowForecast.Compute(April, 0m, [Expense("Rent", 650m, day: 1), Income("Salary", 2000m, day: 28)], []);
 
-        Assert.Equal(650m, forecast.CashBuffer);
+        Assert.Equal(April.FirstDay, forecast.LowPoint.Date);
     }
 
     [Theory]
     [InlineData(0)]
     [InlineData(30)]
     [InlineData(1000)]
-    public void CashBuffer_DoesNotDependOnTheStartingBalance(decimal startingBalance)
+    [InlineData(-100)]
+    public void CashBuffer_IsTheDepthOfTheMonth_WhateverTheStartingBalance(int startingBalance)
     {
         var forecast = CashFlowForecast.Compute(April, startingBalance, Plan, []);
 
@@ -62,18 +49,22 @@ public class LowPointTests
     public void CashBuffer_WhenTheForecastNeverGoesDown_IsZero()
     {
         // Salary on the 1st, rent on the 5th: the account never goes below its starting balance.
-        var forecast = CashFlowForecast.Compute(April, 0m,
-            [Monthly(FlowKind.Income, 2000m, day: 1), Monthly(FlowKind.Expense, 650m, day: 5)], []);
+        var forecast = CashFlowForecast.Compute(April, 0m, [Income("Salary", 2000m, day: 1), Expense("Rent", 650m, day: 5)], []);
 
         Assert.Equal(0m, forecast.CashBuffer);
         Assert.False(forecast.HasAlert);
     }
 
+    public static TheoryData<decimal, bool> StartingBalancesAndAlert => new()
+    {
+        { 0m, true },
+        { 649.99m, true },
+        { 650m, false }, // exactly the buffer: the balance reaches 0 €, not below
+        { 1000m, false },
+    };
+
     [Theory]
-    [InlineData(0, true)]
-    [InlineData(649.99, true)]
-    [InlineData(650, false)] // exactly the buffer: the balance reaches 0 €, not below
-    [InlineData(1000, false)]
+    [MemberData(nameof(StartingBalancesAndAlert))]
     public void HasAlert_WhenTheStartingBalanceDoesNotCoverTheBuffer(decimal startingBalance, bool expectedAlert)
     {
         var forecast = CashFlowForecast.Compute(April, startingBalance, Plan, []);
@@ -90,6 +81,14 @@ public class LowPointTests
         Assert.Equal(0m, forecast.CashBuffer);
     }
 
-    private static RecurringLine Monthly(FlowKind kind, decimal amount, int day) =>
-        new(Guid.NewGuid(), kind, "Line", amount, Frequency.Monthly, day, LongAgo);
+    [Fact]
+    public void HasAlert_WithANegativeStartingBalanceAndNoFlow_IsTrueWithoutAnyDebitToMove()
+    {
+        // The account is already overdrawn: the month itself needs no buffer, there is nothing to move.
+        var forecast = CashFlowForecast.Compute(April, -100m, [], []);
+
+        Assert.True(forecast.HasAlert);
+        Assert.Equal(0m, forecast.CashBuffer);
+        Assert.Empty(forecast.ContributingDebits);
+    }
 }
