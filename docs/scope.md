@@ -34,26 +34,27 @@ The room tracks **cash flows** (what comes in and goes out), not wealth. Account
 
 ```
 RecurringLine
-  id, kind (income | expense), name, amount (EUR)
-  frequency (monthly | quarterly | yearly), day of month (1-31), month (quarterly/yearly only)
-  category, start date, end date (optional)
-  subscription fields (optional): is subscription, end of commitment date
+  id, kind (income | expense), name, amount (EUR, always positive: the kind gives the direction)
+  frequency (monthly | quarterly | yearly), day of month (1-31), anchor month (quarterly/yearly only)
+  category (fixed list, "Other" by default), start date, end date (optional)
+  subscription info (optional, expenses only): end of commitment date
 
 Budget
-  id, name (category), planned monthly amount, active
+  id, name, planned monthly amount
 
 MonthPlan
   month (YYYY-MM), starting balance (default 0)
 
-MonthActual
-  month, budget, actual amount                       one total per budget
+BudgetActual
+  budget, month, actual amount                       one total per budget (0 allowed: nothing spent)
 RecurringOverride
-  month, recurring line, actual amount | skipped     a recurring line differed or did not happen
+  recurring line, month, actual amount | skipped     a recurring line differed or did not happen
 ```
 
 - Amounts are in **euros** only, stored as decimals.
 - The occurrences of a recurring line in a month are **computed**, not stored.
-- A recurring line is considered **paid as planned** unless an override says otherwise.
+- A recurring line is considered **paid as planned** unless an override says otherwise; a budget without actual is considered **spent as planned**.
+- The budgets of a month are the ones passed to the calculation: a budget no longer used is simply not passed (no "active" flag in the domain).
 - **Not stored**: bank details (IBAN, account numbers), individual transactions.
 
 ## Calculation rules
@@ -70,11 +71,11 @@ RecurringOverride
 
 **Cash flow forecast**
 - Daily series of the month, starting from the **starting balance**.
-- Recurring lines on their day; **budgets spread evenly** over the days of the month.
+- Recurring lines on their day; **budgets spread evenly** over the days of the month with the largest remainder method: every day gets the share rounded down to the cent, the remaining cents go one by one to the first days (exact total, never negative, at most one cent between two days).
 - **Low point** = minimum of the series, with its date.
 - **Cash buffer** = how far the series goes below zero when starting from 0 € (0 if it never does): the need of the month itself.
 - **Alert** when the series, starting from the starting balance, goes below zero.
-- **Contributing debits**: the expenses between the last income before the low point and the low point, so the user sees which debit to move.
+- **Contributing debits**: the recurring expenses of the **drawdown**, between the last peak before the low point (the highest balance reached before it, the starting balance counting as the very first one) and the low point, so the user sees which debit to move. An income that does not bring the balance back to its peak does not reset the window: the expenses before it still dig the low point. Budgets are not listed (no date).
 
 ## Views (widgets) of the v1
 
@@ -105,6 +106,7 @@ Bank connection, transaction-level tracking, several bank accounts, currencies o
 
 - Real balance tracking day by day (forecast from the actual balance).
 - Subscriptions views by category and by end of commitment.
+- User-defined categories (create, rename, delete) instead of the fixed list of the v1, which keeps an "Other" value.
 - Simulation: "what if I move this debit to the 2nd?".
 - History and trends over several months.
 - Starting balance proposed from the previous month.
