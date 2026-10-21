@@ -37,7 +37,13 @@ public class FinanceDbContextModelTests
     [InlineData(typeof(RecurringOverrideRow), nameof(RecurringOverrideRow.ActualAmount))]
     public void Amounts_AreStoredAsDecimal18Comma2(Type rowType, string property)
     {
-        Assert.Equal("decimal(18,2)", Property(rowType, property).GetColumnType());
+        var amount = Property(rowType, property);
+
+        // decimal(18,2) is also EF Core's silent default on SQL Server: checking the configured precision makes sure
+        // it is our explicit choice, not a coincidence (EF Core warns about truncation when nothing is configured).
+        Assert.Equal(18, amount.GetPrecision());
+        Assert.Equal(2, amount.GetScale());
+        Assert.Equal("decimal(18,2)", amount.GetColumnType());
     }
 
     [Theory]
