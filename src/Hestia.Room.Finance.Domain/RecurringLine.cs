@@ -25,6 +25,7 @@ public sealed class RecurringLine
         ThrowIfUndefined(kind);
         ThrowIfUndefined(frequency);
         ThrowIfUndefined(category);
+        Guard.ThrowIfEmpty(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         // The sign comes from the kind: an amount is always positive.
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amount);

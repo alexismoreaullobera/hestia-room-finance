@@ -5,6 +5,7 @@ public sealed record BudgetActual
 {
     public BudgetActual(Guid budgetId, YearMonth month, decimal amount)
     {
+        Guard.ThrowIfEmpty(budgetId);
         // Zero is allowed: nothing was spent on that budget.
         ArgumentOutOfRangeException.ThrowIfNegative(amount);
 

@@ -8,6 +8,7 @@ public sealed record RecurringOverride
 {
     private RecurringOverride(Guid lineId, YearMonth month, decimal? actualAmount)
     {
+        Guard.ThrowIfEmpty(lineId);
         LineId = lineId;
         Month = month;
         ActualAmount = actualAmount;
