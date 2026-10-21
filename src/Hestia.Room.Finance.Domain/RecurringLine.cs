@@ -29,6 +29,7 @@ public sealed class RecurringLine
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         // The sign comes from the kind: an amount is always positive.
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amount);
+        Guard.ThrowIfNotCents(amount);
         ArgumentOutOfRangeException.ThrowIfLessThan(dayOfMonth, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(dayOfMonth, 31);
 

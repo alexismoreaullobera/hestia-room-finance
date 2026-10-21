@@ -8,6 +8,7 @@ public sealed class Budget
         Guard.ThrowIfEmpty(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(plannedAmount);
+        Guard.ThrowIfNotCents(plannedAmount);
 
         Id = id;
         Name = name;

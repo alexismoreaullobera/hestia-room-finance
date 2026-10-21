@@ -27,6 +27,7 @@ public sealed record RecurringOverride
     {
         // A zero amount would be an ambiguous "skipped": Skipped says it explicitly.
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(actualAmount);
+        Guard.ThrowIfNotCents(actualAmount);
         return new RecurringOverride(lineId, month, actualAmount);
     }
 

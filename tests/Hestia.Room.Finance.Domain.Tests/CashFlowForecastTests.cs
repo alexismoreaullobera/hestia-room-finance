@@ -91,7 +91,6 @@ public class CashFlowForecastTests
         { 200m, 2026, 4 },
         { 280.33m, 2026, 2 },
         { 1000m, 2028, 2 },
-        { 12.345m, 2026, 1 }, // more than two decimals
     };
 
     [Theory]
