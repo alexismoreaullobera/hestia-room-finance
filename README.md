@@ -9,7 +9,7 @@ The **personal finance room** of Hestia: plan the incomes and expenses of each m
 
 ![show_balance widget rendered in the MCP Inspector](docs/images/t1-inspector-apps.png)
 
-> **Status: in progress.** The business core is done and tested; persistence (SQL Server, EF Core) is being built. The MCP server still exposes the first spike widget on **fake data**: the real tools come next. The v1 features are defined in the [scope](docs/scope.md).
+> **Status: in progress.** The business core and its persistence (SQL Server, EF Core) are done and tested. The MCP server is not wired to the database yet: it still exposes the first spike widget on **fake data**, the real tools come next. The v1 features are defined in the [scope](docs/scope.md).
 
 ## Features
 
@@ -19,7 +19,7 @@ The **personal finance room** of Hestia: plan the incomes and expenses of each m
 - **Cash flow forecast**: the expected balance of the account day by day, its **low point**, the **cash buffer** the month needs, an **alert** below zero, and the **contributing debits** (which debit to move).
 - Amounts in euros with cents, every object valid once created.
 
-**Persistence** (`Hestia.Room.Finance.Infrastructure`, in progress): SQL Server with EF Core, persistence models separate from the domain.
+**Persistence** (`Hestia.Room.Finance.Infrastructure`): SQL Server with EF Core, persistence models separate from the domain, versioned migrations, a reader that loads a month as domain objects, and a fictitious demo plan.
 
 **MCP server** (`Hestia.Room.Finance.Mcp`): Streamable HTTP (stateless); for now the **`show_balance`** spike tool and its **`ui://finance/balance.html`** widget (MCP Apps), on fake data.
 
@@ -39,7 +39,7 @@ Hestia.Room.Finance.Domain          business rules and calculations, pure C#: no
 
 ## Quickstart
 
-**Prerequisites:** [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (the exact version is pinned in `global.json`) and [Node.js](https://nodejs.org/) (for the MCP Inspector only).
+**Prerequisites:** [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (the exact version is pinned in `global.json`), [Docker](https://www.docker.com/products/docker-desktop/) (local SQL Server and database tests) and [Node.js](https://nodejs.org/) (for the MCP Inspector only).
 
 1. Clone and run the server:
    ```bash
@@ -56,14 +56,40 @@ Hestia.Room.Finance.Domain          business rules and calculations, pure C#: no
 
 3. In the Inspector, connect with transport **Streamable HTTP** and URL `http://localhost:5135/mcp`, then open the **Apps** tab and select `show_balance`.
 
+## Local database
+
+The MCP server does not use the database yet; these steps prepare it.
+
+1. Choose a password for the local SQL Server (the `.env` file is never committed):
+   ```bash
+   cp .env.example .env
+   ```
+   Then edit `.env`: at least 8 characters, with 3 of uppercase, lowercase, digit and symbol.
+2. Start SQL Server (bound to `localhost` only, data kept in a Docker volume):
+   ```bash
+   docker compose up -d
+   ```
+3. Apply the migrations with the `dotnet-ef` version pinned in `dotnet-tools.json`, passing the connection string in the `HESTIA_FINANCE_CONNECTION` environment variable (never written in the code):
+   ```bash
+   dotnet tool restore
+   ```
+   ```bash
+   dotnet ef database update --project src/Hestia.Room.Finance.Infrastructure
+   ```
+   With for instance `HESTIA_FINANCE_CONNECTION="Server=127.0.0.1,1433;Database=HestiaFinance;User Id=sa;Password=<your password>;Encrypt=True;TrustServerCertificate=True"`.
+
+`docker compose down` stops the database and keeps the data; `docker compose down -v` deletes it.
+
 ## Tests
+
+**Docker must be running**: the infrastructure tests start a throwaway SQL Server with Testcontainers.
 
 ```bash
 dotnet test
 ```
 
 - **Domain**: every calculation rule of the [scope](docs/scope.md), with business-named tests; sensitive rules checked by mutation.
-- **Infrastructure**: domain ↔ row conversions, and the database schema (column types, keys, cascades, check constraints) checked offline from the EF Core model.
+- **Infrastructure**: domain ↔ row conversions and the schema checked offline from the EF Core model; then, on a real SQL Server (Testcontainers, one fresh migrated database per test): migrations, round trip of every entity, constraints, cascades, the month reader and the demo seeder.
 - **MCP server**: unit tests on the `show_balance` tool, and integration tests on the `/mcp` endpoint with an in-memory server (tool and widget metadata, widget MIME type and CSP, host filtering).
 
 Tests use xUnit v3 on the Microsoft Testing Platform (declared in `global.json`).
@@ -93,6 +119,8 @@ Every change goes through a pull request: `main` is protected, and the CI (build
 │  └─ Hestia.Room.Finance.Mcp/             MCP server: Tools/, Views/ (widgets), Data/ (fake data, temporary)
 ├─ tests/                                  one test project per project above
 ├─ docs/                                   scope and technical notes
+├─ docker-compose.yml                      local SQL Server (password in .env, see .env.example)
+├─ dotnet-tools.json                       pinned .NET tools (dotnet-ef)
 ├─ .github/                                CI, CodeQL, secrets scan, Dependabot
 ├─ .githooks/                              versioned git hooks
 └─ Directory.Build.props                   settings shared by every project (vulnerable dependencies fail the build)
