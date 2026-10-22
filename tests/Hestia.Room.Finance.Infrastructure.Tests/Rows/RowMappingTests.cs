@@ -87,20 +87,20 @@ public class RowMappingTests
     [Fact]
     public void RecurringOverride_WithAmount_SurvivesTheRoundTrip()
     {
-        var correction = RecurringOverride.WithAmount(Guid.CreateVersion7(), April, 52m);
+        var lineOverride = RecurringOverride.WithAmount(Guid.CreateVersion7(), April, 52m);
 
-        Assert.Equal(correction, correction.ToRow().ToDomain());
+        Assert.Equal(lineOverride, lineOverride.ToRow().ToDomain());
     }
 
     [Fact]
     public void RecurringOverride_Skipped_IsStoredWithoutAmount()
     {
-        var correction = RecurringOverride.Skipped(Guid.CreateVersion7(), April);
+        var lineOverride = RecurringOverride.Skipped(Guid.CreateVersion7(), April);
 
-        var row = correction.ToRow();
+        var row = lineOverride.ToRow();
 
         Assert.Null(row.ActualAmount);
-        Assert.Equal(correction, row.ToDomain());
+        Assert.Equal(lineOverride, row.ToDomain());
     }
 
     [Fact]

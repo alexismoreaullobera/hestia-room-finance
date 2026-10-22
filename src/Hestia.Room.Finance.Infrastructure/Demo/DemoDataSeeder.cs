@@ -14,7 +14,8 @@ public sealed class DemoDataSeeder(FinanceDbContext context)
     public async Task<bool> SeedIfEmptyAsync(YearMonth currentMonth, CancellationToken cancellationToken = default)
     {
         var hasPlan = await context.RecurringLines.AnyAsync(cancellationToken)
-            || await context.Budgets.AnyAsync(cancellationToken);
+            || await context.Budgets.AnyAsync(cancellationToken)
+            || await context.MonthPlans.AnyAsync(cancellationToken);
         if (hasPlan)
         {
             return false;
@@ -25,7 +26,7 @@ public sealed class DemoDataSeeder(FinanceDbContext context)
         context.Budgets.AddRange(demo.Budgets.Select(budget => budget.ToRow()));
         context.MonthPlans.AddRange(demo.MonthPlans.Select(plan => plan.ToRow()));
         context.BudgetActuals.AddRange(demo.BudgetActuals.Select(actual => actual.ToRow()));
-        context.RecurringOverrides.AddRange(demo.Overrides.Select(correction => correction.ToRow()));
+        context.RecurringOverrides.AddRange(demo.Overrides.Select(lineOverride => lineOverride.ToRow()));
 
         // One SaveChanges: the whole demo plan is saved in a single transaction, or not at all.
         await context.SaveChangesAsync(cancellationToken);

@@ -16,7 +16,7 @@ internal sealed class FinanceDbContextDesignTimeFactory : IDesignTimeDbContextFa
     public FinanceDbContext CreateDbContext(string[] args)
     {
         var connectionString = Environment.GetEnvironmentVariable(ConnectionVariable) ?? "Server=not-configured";
-        var options = FinanceDbContext.UseRoomSqlServer(new DbContextOptionsBuilder<FinanceDbContext>(), connectionString).Options;
+        var options = new DbContextOptionsBuilder<FinanceDbContext>().UseRoomSqlServer(connectionString).Options;
         return new FinanceDbContext(options);
     }
 }

@@ -30,7 +30,7 @@ public sealed class FinancePlanReader(FinanceDbContext context)
             .ToListAsync(cancellationToken);
 
         var overrides = await context.RecurringOverrides.AsNoTracking()
-            .Where(correction => correction.Month == firstDay)
+            .Where(lineOverride => lineOverride.Month == firstDay)
             .ToListAsync(cancellationToken);
 
         var plan = await context.MonthPlans.AsNoTracking()

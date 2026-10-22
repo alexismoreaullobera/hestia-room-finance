@@ -27,7 +27,7 @@ The **personal finance room** of Hestia: plan the incomes and expenses of each m
 
 ```
 Hestia.Room.Finance.Mcp             MCP server: tools and widgets (ASP.NET Core)
-        │ uses
+        │ will use (T6)
 Hestia.Room.Finance.Infrastructure  SQL Server through EF Core: persistence rows, conversions
         │ depends on
 Hestia.Room.Finance.Domain          business rules and calculations, pure C#: no database, no MCP, no clock
@@ -73,10 +73,12 @@ The MCP server does not use the database yet; these steps prepare it.
    ```bash
    dotnet tool restore
    ```
+   The password is typed at a hidden prompt, so it never lands in the shell history:
    ```bash
+   read -rsp "SQL Server password: " SA_PASSWORD && echo
+   export HESTIA_FINANCE_CONNECTION="Server=127.0.0.1,1433;Database=HestiaFinance;User Id=sa;Password=$SA_PASSWORD;Encrypt=True;TrustServerCertificate=True"
    dotnet ef database update --project src/Hestia.Room.Finance.Infrastructure
    ```
-   With for instance `HESTIA_FINANCE_CONNECTION="Server=127.0.0.1,1433;Database=HestiaFinance;User Id=sa;Password=<your password>;Encrypt=True;TrustServerCertificate=True"`.
 
 `docker compose down` stops the database and keeps the data; `docker compose down -v` deletes it.
 

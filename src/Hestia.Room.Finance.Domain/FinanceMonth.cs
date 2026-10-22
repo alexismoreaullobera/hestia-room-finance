@@ -2,8 +2,8 @@ namespace Hestia.Room.Finance.Domain;
 
 /// <summary>
 /// Everything that describes one month of the plan (starting balance, recurring lines, budgets, actuals and
-/// overrides of that month), with the calculations of the month. This is what a reader returns: the callers
-/// (MCP tools, widgets) never assemble the pieces themselves.
+/// overrides of that month), with the calculations of the month: one complete month, so that no caller assembles
+/// the pieces itself.
 /// </summary>
 public sealed class FinanceMonth
 {

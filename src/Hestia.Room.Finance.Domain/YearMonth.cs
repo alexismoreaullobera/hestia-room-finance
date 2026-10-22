@@ -31,5 +31,8 @@ public readonly record struct YearMonth
 
     public bool Contains(DateOnly date) => date.Year == Year && date.Month == Month;
 
+    /// <summary>The month <paramref name="months"/> months later, or earlier when negative.</summary>
+    public YearMonth AddMonths(int months) => From(FirstDay.AddMonths(months));
+
     public override string ToString() => $"{Year:D4}-{Month:D2}";
 }

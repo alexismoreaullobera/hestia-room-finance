@@ -16,8 +16,7 @@ internal static class Guard
     }
 
     /// <summary>
-    /// Rejects an amount with more than two decimals: a bank account knows no fraction of a cent,
-    /// and the database stores amounts as decimal(18,2).
+    /// Rejects an amount with more than two decimals: a bank account knows no fraction of a cent.
     /// </summary>
     public static void ThrowIfNotCents(decimal amount, [CallerArgumentExpression(nameof(amount))] string? paramName = null)
     {

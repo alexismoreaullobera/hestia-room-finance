@@ -12,10 +12,13 @@ namespace Hestia.Room.Finance.Infrastructure.Tests.Database;
 public sealed class SqlServerFixture : IAsyncLifetime
 {
     // Same pinned image as docker-compose.yml: the tests run against the version used locally.
+    // A random password per run, instead of the well-known default one of Testcontainers, while the port is open.
     private readonly MsSqlContainer _container =
-        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04").Build();
+        new MsSqlBuilder("mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04")
+            .WithPassword($"Aa1!{Guid.NewGuid():N}")
+            .Build();
 
-    public async ValueTask InitializeAsync() => await _container.StartAsync();
+    public async ValueTask InitializeAsync() => await _container.StartAsync(TestContext.Current.CancellationToken);
 
     public async ValueTask DisposeAsync() => await _container.DisposeAsync();
 
@@ -26,7 +29,7 @@ public sealed class SqlServerFixture : IAsyncLifetime
         {
             InitialCatalog = $"finance_test_{Guid.NewGuid():N}",
         };
-        var options = FinanceDbContext.UseRoomSqlServer(new DbContextOptionsBuilder<FinanceDbContext>(), connection.ConnectionString).Options;
+        var options = new DbContextOptionsBuilder<FinanceDbContext>().UseRoomSqlServer(connection.ConnectionString).Options;
 
         await using var context = new FinanceDbContext(options);
         await context.Database.MigrateAsync(TestContext.Current.CancellationToken);

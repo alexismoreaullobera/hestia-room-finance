@@ -77,8 +77,8 @@ public sealed record MonthSummary(
     }
 
     private static decimal ActualAmountOf(RecurringLine line, Dictionary<Guid, RecurringOverride> overrideByLine) =>
-        overrideByLine.TryGetValue(line.Id, out var correction)
-            ? correction.ActualAmount ?? 0m
+        overrideByLine.TryGetValue(line.Id, out var lineOverride)
+            ? lineOverride.ActualAmount ?? 0m
             : line.Amount;
 
     private static Dictionary<Guid, T> UniqueByKey<T>(IEnumerable<T> items, Func<T, Guid> key, string paramName)

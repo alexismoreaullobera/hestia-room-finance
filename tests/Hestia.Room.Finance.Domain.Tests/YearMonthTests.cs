@@ -49,6 +49,17 @@ public class YearMonthTests
     }
 
     [Theory]
+    [InlineData(0, 2026, 10)]
+    [InlineData(2, 2026, 12)]
+    [InlineData(3, 2027, 1)]
+    [InlineData(-10, 2025, 12)]
+    [InlineData(-22, 2024, 12)]
+    public void AddMonths_MovesAcrossYears(int months, int expectedYear, int expectedMonth)
+    {
+        Assert.Equal(new YearMonth(expectedYear, expectedMonth), new YearMonth(2026, 10).AddMonths(months));
+    }
+
+    [Theory]
     [InlineData(2026, 4, "2026-04")]
     [InlineData(2026, 12, "2026-12")]
     public void ToString_IsYearDashMonth(int year, int month, string expected)

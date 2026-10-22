@@ -63,11 +63,11 @@ public static class RowMapping
 
     public static BudgetActual ToDomain(this BudgetActualRow row) => new(row.BudgetId, ToYearMonth(row.Month), row.Amount);
 
-    public static RecurringOverrideRow ToRow(this RecurringOverride correction) => new()
+    public static RecurringOverrideRow ToRow(this RecurringOverride lineOverride) => new()
     {
-        LineId = correction.LineId,
-        Month = correction.Month.FirstDay,
-        ActualAmount = correction.ActualAmount,
+        LineId = lineOverride.LineId,
+        Month = lineOverride.Month.FirstDay,
+        ActualAmount = lineOverride.ActualAmount,
     };
 
     public static RecurringOverride ToDomain(this RecurringOverrideRow row) =>

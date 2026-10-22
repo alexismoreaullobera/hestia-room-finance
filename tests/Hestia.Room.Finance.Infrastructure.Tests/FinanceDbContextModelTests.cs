@@ -17,7 +17,7 @@ public class FinanceDbContextModelTests
     static FinanceDbContextModelTests()
     {
         // The connection string is never opened: the model and the script are built offline.
-        var options = FinanceDbContext.UseRoomSqlServer(new DbContextOptionsBuilder<FinanceDbContext>(), "Server=offline").Options;
+        var options = new DbContextOptionsBuilder<FinanceDbContext>().UseRoomSqlServer("Server=offline").Options;
         using var context = new FinanceDbContext(options);
         Model = context.GetService<IDesignTimeModel>().Model;
         CreateScript = context.Database.GenerateCreateScript();
@@ -132,7 +132,7 @@ public class FinanceDbContextModelTests
     }
 
     private static FinanceDbContext OfflineContext() =>
-        new(FinanceDbContext.UseRoomSqlServer(new DbContextOptionsBuilder<FinanceDbContext>(), "Server=offline").Options);
+        new(new DbContextOptionsBuilder<FinanceDbContext>().UseRoomSqlServer("Server=offline").Options);
 
     private static IProperty Property(Type rowType, string name) => Model.FindEntityType(rowType)!.FindProperty(name)!;
 }
