@@ -17,7 +17,7 @@ public class FinanceDbContextModelTests
     static FinanceDbContextModelTests()
     {
         // The connection string is never opened: the model and the script are built offline.
-        var options = new DbContextOptionsBuilder<FinanceDbContext>().UseSqlServer("Server=offline").Options;
+        var options = FinanceDbContext.UseRoomSqlServer(new DbContextOptionsBuilder<FinanceDbContext>(), "Server=offline").Options;
         using var context = new FinanceDbContext(options);
         Model = context.GetService<IDesignTimeModel>().Model;
         CreateScript = context.Database.GenerateCreateScript();
@@ -101,6 +101,13 @@ public class FinanceDbContextModelTests
     }
 
     [Fact]
+    public void MigrationsHistory_IsInTheFinanceSchema()
+    {
+        // Several rooms may share a database: each keeps its own migrations history.
+        Assert.Contains("CREATE TABLE [finance].[__EFMigrationsHistory]", CreateScriptWithHistory());
+    }
+
+    [Fact]
     public void Migrations_AreUpToDateWithTheModel()
     {
         // Fails when the configuration changes without a new migration: run `dotnet ef migrations add <Name>`.
@@ -117,8 +124,15 @@ public class FinanceDbContextModelTests
         Assert.EndsWith("_InitialCreate", context.Database.GetMigrations().First());
     }
 
+    private static string CreateScriptWithHistory()
+    {
+        using var context = OfflineContext();
+        var migrator = context.GetService<Microsoft.EntityFrameworkCore.Migrations.IMigrator>();
+        return migrator.GenerateScript();
+    }
+
     private static FinanceDbContext OfflineContext() =>
-        new(new DbContextOptionsBuilder<FinanceDbContext>().UseSqlServer("Server=offline").Options);
+        new(FinanceDbContext.UseRoomSqlServer(new DbContextOptionsBuilder<FinanceDbContext>(), "Server=offline").Options);
 
     private static IProperty Property(Type rowType, string name) => Model.FindEntityType(rowType)!.FindProperty(name)!;
 }

@@ -29,6 +29,17 @@ updates:
     commit-message:
       prefix: deps
 
+  # Docker images of docker-compose.yml (the local SQL Server).
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "06:00"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: deps
+
   # GitHub Actions used by the workflows (updates the pinned SHA and its version comment).
   - package-ecosystem: github-actions
     directory: /

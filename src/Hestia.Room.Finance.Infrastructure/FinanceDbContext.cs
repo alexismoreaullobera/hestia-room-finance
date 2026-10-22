@@ -22,6 +22,15 @@ public sealed class FinanceDbContext(DbContextOptions<FinanceDbContext> options)
 
     public DbSet<RecurringOverrideRow> RecurringOverrides => Set<RecurringOverrideRow>();
 
+    /// <summary>
+    /// The SQL Server settings of the room, shared by every place that creates the context (application, design-time
+    /// factory, tests): the migrations history table also lives in the room schema, so that several rooms sharing a
+    /// database never mix their migration histories.
+    /// </summary>
+    public static DbContextOptionsBuilder<FinanceDbContext> UseRoomSqlServer(
+        DbContextOptionsBuilder<FinanceDbContext> options, string connectionString) =>
+        options.UseSqlServer(connectionString, sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", Schema));
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
