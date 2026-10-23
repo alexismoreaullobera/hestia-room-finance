@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Hestia.Room.Finance.Domain;
 
 /// <summary>
@@ -35,4 +37,25 @@ public readonly record struct YearMonth
     public YearMonth AddMonths(int months) => From(FirstDay.AddMonths(months));
 
     public override string ToString() => $"{Year:D4}-{Month:D2}";
+
+    /// <summary>
+    /// Reads a month written as <c>YYYY-MM</c>, the format of <see cref="ToString"/> (e.g. 2026-04).
+    /// Strict: exactly four digits, a dash and two digits, nothing around them.
+    /// </summary>
+    public static bool TryParse(string? text, out YearMonth month)
+    {
+        month = default;
+
+        // NumberStyles.None: no sign, no space, ASCII digits only.
+        if (text is not { Length: 7 } || text[4] != '-'
+            || !int.TryParse(text.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out var year)
+            || !int.TryParse(text.AsSpan(5, 2), NumberStyles.None, CultureInfo.InvariantCulture, out var monthNumber)
+            || year < 1 || monthNumber is < 1 or > 12)
+        {
+            return false;
+        }
+
+        month = new YearMonth(year, monthNumber);
+        return true;
+    }
 }
