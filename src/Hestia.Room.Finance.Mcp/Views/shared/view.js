@@ -81,6 +81,8 @@ async function startView(view) {
   const content = document.getElementById("content");
   const app = new App({ name: `Hestia Finance - ${view.name}`, version: "0.2.0" });
   let shown = null;
+  let lastData = null;
+  let renderedWidth = 0;
 
   function setStatus(text, isError = false) {
     status.textContent = text;
@@ -100,13 +102,27 @@ async function startView(view) {
     }
     const data = result.structuredContent;
     shown = data.month;
+    lastData = data;
     monthTitle.textContent = formatMonth(data.month);
     setStatus("");
+    render();
+  }
+
+  function render() {
     content.replaceChildren();
     // Visible before rendering, so that a view can measure its width (the chart draws at the real size).
     content.hidden = false;
-    view.render(data, content);
+    renderedWidth = content.clientWidth;
+    view.render(lastData, content);
   }
+
+  // Drawn again when the width changes (window resized, browser zoom): only the width, since a new rendering
+  // changes the height, which would otherwise trigger another rendering.
+  new ResizeObserver(() => {
+    if (lastData !== null && content.clientWidth !== renderedWidth) {
+      render();
+    }
+  }).observe(content);
 
   async function goTo(month) {
     setNavigation(false);
