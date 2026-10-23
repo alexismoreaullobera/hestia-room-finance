@@ -8,5 +8,6 @@
     <Project Path="tests/Hestia.Room.Finance.Domain.Tests/Hestia.Room.Finance.Domain.Tests.csproj" />
     <Project Path="tests/Hestia.Room.Finance.Infrastructure.Tests/Hestia.Room.Finance.Infrastructure.Tests.csproj" />
     <Project Path="tests/Hestia.Room.Finance.Mcp.Tests/Hestia.Room.Finance.Mcp.Tests.csproj" />
+    <Project Path="tests/Hestia.Room.Finance.Testing/Hestia.Room.Finance.Testing.csproj" />
   </Folder>
 </Solution>

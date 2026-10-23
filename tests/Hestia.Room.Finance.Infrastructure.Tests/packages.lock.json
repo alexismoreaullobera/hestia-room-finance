@@ -2,15 +2,6 @@
   "version": 1,
   "dependencies": {
     "net10.0": {
-      "Testcontainers.MsSql": {
-        "type": "Direct",
-        "requested": "[4.16.0, )",
-        "resolved": "4.16.0",
-        "contentHash": "UVLYLyq9CDSfLZUeu+CyDmwV7wo2LMNlpBLP8ZO9HG42WT3KTMI/p7qYesiCAZmo6GUeWH/Z6SOIw66Y4qnWuw==",
-        "dependencies": {
-          "Testcontainers": "4.16.0"
-        }
-      },
       "xunit.v3.mtp-v2": {
         "type": "Direct",
         "requested": "[4.0.2, )",
@@ -454,6 +445,14 @@
           "SharpZipLib": "1.4.2"
         }
       },
+      "Testcontainers.MsSql": {
+        "type": "Transitive",
+        "resolved": "4.16.0",
+        "contentHash": "UVLYLyq9CDSfLZUeu+CyDmwV7wo2LMNlpBLP8ZO9HG42WT3KTMI/p7qYesiCAZmo6GUeWH/Z6SOIw66Y4qnWuw==",
+        "dependencies": {
+          "Testcontainers": "4.16.0"
+        }
+      },
       "xunit.analyzers": {
         "type": "Transitive",
         "resolved": "2.2.0",
@@ -521,6 +520,14 @@
           "Hestia.Room.Finance.Domain": "[1.0.0, )",
           "Microsoft.EntityFrameworkCore.SqlServer": "[10.0.13, )",
           "System.Security.Cryptography.Pkcs": "[10.0.13, )"
+        }
+      },
+      "hestia.room.finance.testing": {
+        "type": "Project",
+        "dependencies": {
+          "Hestia.Room.Finance.Infrastructure": "[1.0.0, )",
+          "Testcontainers.MsSql": "[4.16.0, )",
+          "xunit.v3.extensibility.core": "[4.0.2, )"
         }
       }
     }

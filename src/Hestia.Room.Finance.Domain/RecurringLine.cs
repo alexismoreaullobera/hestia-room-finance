@@ -106,6 +106,18 @@ public sealed class RecurringLine
     };
 
     /// <summary>
+    /// What the line weighs over a year: 12, 4 or 1 debits. Counted from the debits, so exact by construction,
+    /// rather than 12 × <see cref="MonthlyEquivalent"/>, which goes through a division.
+    /// </summary>
+    public decimal YearlyAmount => Frequency switch
+    {
+        Frequency.Monthly => Amount * 12,
+        Frequency.Quarterly => Amount * 4,
+        Frequency.Yearly => Amount,
+        _ => throw new InvalidOperationException($"Unknown frequency {Frequency}."),
+    };
+
+    /// <summary>
     /// True if the line runs during at least part of the month, whether or not it falls due that month
     /// (a yearly insurance runs all year long). Used by the smoothed reading of the monthly summary.
     /// </summary>

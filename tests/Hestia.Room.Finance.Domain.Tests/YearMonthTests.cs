@@ -67,6 +67,48 @@ public class YearMonthTests
         Assert.Equal(expected, new YearMonth(year, month).ToString());
     }
 
+    [Theory]
+    [InlineData("2026-04", 2026, 4)]
+    [InlineData("2026-12", 2026, 12)]
+    [InlineData("0001-01", 1, 1)]
+    [InlineData("9999-12", 9999, 12)]
+    public void TryParse_ReadsTheYearDashMonthFormat(string text, int expectedYear, int expectedMonth)
+    {
+        Assert.True(YearMonth.TryParse(text, out var month));
+        Assert.Equal(new YearMonth(expectedYear, expectedMonth), month);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("2026-4")]
+    [InlineData("2026-13")]
+    [InlineData("2026-00")]
+    [InlineData("0000-01")]
+    [InlineData("2026/04")]
+    [InlineData(" 2026-04")]
+    [InlineData("2026-04 ")]
+    [InlineData("+026-04")]
+    [InlineData("2026-+4")]
+    [InlineData("2026-04-01")]
+    [InlineData("avril 2026")]
+    [InlineData("２０２６-04")] // full-width digits: ASCII digits only
+    [InlineData("٢٠٢٦-04")] // Arabic-Indic digits
+    public void TryParse_RejectsAnythingElse(string? text)
+    {
+        Assert.False(YearMonth.TryParse(text, out var month));
+        Assert.Equal(default, month);
+    }
+
+    [Fact]
+    public void TryParse_ReadsBackToString()
+    {
+        var april = new YearMonth(2026, 4);
+
+        Assert.True(YearMonth.TryParse(april.ToString(), out var parsed));
+        Assert.Equal(april, parsed);
+    }
+
     [Fact]
     public void Equality_IsByValue()
     {
