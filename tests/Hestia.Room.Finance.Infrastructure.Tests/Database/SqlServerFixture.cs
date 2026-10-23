@@ -22,14 +22,17 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
     public async ValueTask DisposeAsync() => await _container.DisposeAsync();
 
+    /// <summary>The connection string of a new database, not created yet: EF Core creates it when migrating.</summary>
+    public string NewDatabaseConnectionString() =>
+        new SqlConnectionStringBuilder(_container.GetConnectionString())
+        {
+            InitialCatalog = $"finance_test_{Guid.NewGuid():N}",
+        }.ConnectionString;
+
     /// <summary>A new, empty database with every migration applied, and the options to connect to it.</summary>
     public async Task<DbContextOptions<FinanceDbContext>> CreateMigratedDatabaseAsync()
     {
-        var connection = new SqlConnectionStringBuilder(_container.GetConnectionString())
-        {
-            InitialCatalog = $"finance_test_{Guid.NewGuid():N}",
-        };
-        var options = new DbContextOptionsBuilder<FinanceDbContext>().UseRoomSqlServer(connection.ConnectionString).Options;
+        var options = new DbContextOptionsBuilder<FinanceDbContext>().UseRoomSqlServer(NewDatabaseConnectionString()).Options;
 
         await using var context = new FinanceDbContext(options);
         await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
