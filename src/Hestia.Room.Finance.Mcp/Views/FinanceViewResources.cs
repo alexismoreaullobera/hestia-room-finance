@@ -27,8 +27,9 @@ public static class FinanceViewResources
             "View of show_subscriptions: monthly and yearly totals, debits of the month and commitment ends."),
     ];
 
-    // No external domain: the views are self-contained, the App SDK included. The host CSP then allows no network
-    // access and no third-party code (an empty CSP, stated explicitly).
+    // No external domain: the views are self-contained, the App SDK included. With an empty CSP, the host applies the
+    // MCP Apps default: no fetch, XHR or WebSocket, no external script, style or image. The navigation of the frame
+    // and the requests to the host (open a link, send a message) are governed by the host, not by this CSP.
     private static readonly McpUiResourceMeta ViewUi = new()
     {
         Csp = new McpUiResourceCsp(),

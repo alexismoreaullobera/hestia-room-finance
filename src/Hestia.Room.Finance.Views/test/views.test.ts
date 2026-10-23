@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { cashFlowForecast, chart, MIN_WIDTH } from "../src/cash-flow-forecast";
 import { monthOverview } from "../src/month-overview";
 import type { CashFlowForecastOutput, MonthSummaryOutput, SubscriptionsOutput } from "../src/shared/outputs";
-import { formatEuros } from "../src/shared/view";
+import { formatEuros } from "../src/shared/format";
 import { subscriptions } from "../src/subscriptions";
 import forecastFixture from "./fixtures/cash-flow-forecast.json";
 import monthFixture from "./fixtures/month-overview.json";

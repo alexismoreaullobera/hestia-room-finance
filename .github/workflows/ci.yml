@@ -51,7 +51,16 @@ jobs:
       # build, which then builds and embeds them.
       - name: Install the views dependencies
         working-directory: src/Hestia.Room.Finance.Views
-        run: npm ci --no-audit --no-fund
+        run: npm ci --no-audit --no-fund --ignore-scripts
+
+      # Fails if an installed package lost its registry signature (or its provenance attestation, when it has one).
+      - name: Verify the npm signatures
+        working-directory: src/Hestia.Room.Finance.Views
+        run: npm audit signatures
+
+      - name: Type-check the views and their tests
+        working-directory: src/Hestia.Room.Finance.Views
+        run: npm run typecheck
 
       - name: Lint the views
         working-directory: src/Hestia.Room.Finance.Views

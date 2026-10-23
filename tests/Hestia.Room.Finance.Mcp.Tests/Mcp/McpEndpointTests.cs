@@ -198,7 +198,7 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
     /// <summary>Every domain the CSP of a view allows, whatever the directive: none, the views being self-contained.</summary>
     private static IEnumerable<string?> CspDomains(JsonNode resource) =>
-        resource["_meta"]?["ui"]?["csp"]?.AsObject().SelectMany(directive => directive.Value?.AsArray() ?? []).Select(d => (string?)d) ?? [];
+        resource["_meta"]?["ui"]?["csp"]?.AsObject().SelectMany(directive => directive.Value as JsonArray ?? []).Select(d => (string?)d) ?? [];
 
     /// <summary>The annotations of a tool without its title: the hints a view tool shares with its data tool.</summary>
     private static JsonObject HintsOf(JsonNode tool)

@@ -30,8 +30,11 @@ updates:
     # release has time to be detected and pulled before it reaches the repository.
     cooldown:
       default-days: 7
+    # The development tooling is grouped; the packages inlined in the views (SDK, client, core, zod) run in the host:
+    # each of their updates comes in its own pull request, to review by hand (npm diff on the published package).
     groups:
-      npm-minor-and-patch:
+      npm-dev-minor-and-patch:
+        dependency-type: development
         update-types: [minor, patch]
     commit-message:
       prefix: deps

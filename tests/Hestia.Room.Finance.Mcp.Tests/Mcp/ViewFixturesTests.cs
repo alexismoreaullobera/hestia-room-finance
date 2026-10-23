@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -14,10 +15,12 @@ public class ViewFixturesTests(McpServerFixture mcp)
 {
     private const string UpdateVariable = "HESTIA_UPDATE_VIEW_FIXTURES";
 
-    // Identifiers change with every seed (Guid v7): replaced by a constant, they carry no information for a view.
-    private const string FixedId = "00000000-0000-0000-0000-000000000000";
-
-    private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+    // Readable fixtures ("Électricité", not \u00C9lectricit\u00E9): read by JSON.parse, never inserted in markup.
+    private static readonly JsonSerializerOptions Indented = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
 
     private readonly McpTestClient _mcp = new(mcp.Server.CreateClient());
 
@@ -33,20 +36,28 @@ public class ViewFixturesTests(McpServerFixture mcp)
 
         if (Environment.GetEnvironmentVariable(UpdateVariable) == "1")
         {
+            // Never in the CI: there, an out-of-date fixture must fail, not be rewritten.
+            Assert.False(Environment.GetEnvironmentVariable("CI") == "true", $"{UpdateVariable} must not be set in the CI.");
             await File.WriteAllTextAsync(path, expected, TestContext.Current.CancellationToken);
         }
 
         Assert.True(File.Exists(path), $"Missing fixture {path}: run this test with {UpdateVariable}=1.");
         var actual = (await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken)).ReplaceLineEndings("\n");
-        Assert.True(expected == actual, $"{fixture} is out of date: run this test with {UpdateVariable}=1, then update the views.");
+        // Out of date: run this test with HESTIA_UPDATE_VIEW_FIXTURES=1, then update the views.
+        Assert.Equal(expected, actual);
     }
 
+    /// <summary>
+    /// Identifiers change with every seed (Guid v7): replaced by stable ones, distinct for each item, so that a view
+    /// keyed on them would still see different identifiers.
+    /// </summary>
     private static JsonNode WithFixedIds(JsonNode node)
     {
         var copy = node.DeepClone();
+        var index = 0;
         foreach (var item in copy["subscriptions"]?.AsArray() ?? [])
         {
-            item!["id"] = FixedId;
+            item!["id"] = $"00000000-0000-0000-0000-{++index:D12}";
         }
         return copy;
     }

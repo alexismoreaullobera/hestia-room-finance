@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  amount, applyHostTheme, card, element, formatDate, formatDay, formatEuros, formatMonth, shiftMonth, svg, translate,
-} from "../src/shared/view";
+import { amount, card, element, svg } from "../src/shared/dom";
+import { formatDate, formatDay, formatEuros, formatMonth, shiftMonth, translate } from "../src/shared/format";
+import { applyHostTheme } from "../src/shared/view";
 import { plain } from "./helpers";
 
 describe("formats", () => {

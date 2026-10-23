@@ -1,6 +1,6 @@
 import { vi } from "vitest";
+import { element } from "../src/shared/dom";
 import type { HostApp } from "../src/shared/view";
-import { element } from "../src/shared/view";
 
 /** The page skeleton every view has (see views/*.html), built with the kit itself. */
 export function pageSkeleton(): HTMLElement {
@@ -8,7 +8,7 @@ export function pageSkeleton(): HTMLElement {
   content.hidden = true;
   document.body.replaceChildren(
     element("button", { attributes: { id: "previous" } }),
-    element("h1", {}, element("span", { attributes: { id: "month" } })),
+    element("h1", {}, element("span", { attributes: { id: "label" } }), element("span", { attributes: { id: "month" } })),
     element("button", { attributes: { id: "next" } }),
     element("p", { attributes: { id: "status" } }),
     content);

@@ -1,9 +1,11 @@
 import type { Category, Frequency, SubscriptionOutput, SubscriptionsOutput } from "./shared/outputs";
-import { amount, card, element, formatDate, formatDay, formatEuros, translate, type ViewDefinition } from "./shared/view";
+import { amount, card, element } from "./shared/dom";
+import { formatDate, formatDay, formatEuros, translate } from "./shared/format";
+import type { ViewDefinition } from "./shared/view";
 import "./subscriptions.css";
 
 // French names of the Frequency and Category enums: a Record over the union types, so a value added to outputs.ts
-// without a translation does not compile; a C# test checks that outputs.ts follows the domain enums.
+// without a translation does not compile; a C# test checks that the unions of outputs.ts equal the domain enums.
 export const frequencies: Readonly<Record<Frequency, string>> = { Monthly: "mensuel", Quarterly: "trimestriel", Yearly: "annuel" };
 export const categories: Readonly<Record<Category, string>> = {
   Other: "Autre", Income: "Revenu", Housing: "Logement", Utilities: "Énergie", Telecom: "Télécom",
@@ -16,6 +18,7 @@ function subscriptionRow(subscription: SubscriptionOutput): HTMLElement {
     element("td", {},
       subscription.name,
       element("span", { className: "detail", text: translate(categories, subscription.category) })),
+    // The amount as plain text, not amount(): a subscription is never negative, and it shares the cell with its frequency.
     element("td", { className: "amount" },
       formatEuros(subscription.amount),
       element("span", { className: "detail", text: translate(frequencies, subscription.frequency) })),

@@ -33,28 +33,37 @@
     and the Vite build when a source changed (Inputs/Outputs): Node.js is a prerequisite, as Docker for the tests.
   -->
   <PropertyGroup>
-    <ViewsProjectDir>$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../Hestia.Room.Finance.Views'))))</ViewsProjectDir>
+    <ViewsProjectDir>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', 'Hestia.Room.Finance.Views'))</ViewsProjectDir>
     <ViewsDistDir>$(ViewsProjectDir)dist\</ViewsDistDir>
   </PropertyGroup>
 
   <ItemGroup>
     <ViewsSource Include="$(ViewsProjectDir)src\**\*;$(ViewsProjectDir)views\*.html" />
-    <ViewsSource Include="$(ViewsProjectDir)package-lock.json;$(ViewsProjectDir)build.js;$(ViewsProjectDir)vite.config.ts;$(ViewsProjectDir)tsconfig.json" />
+    <ViewsSource Include="$(ViewsProjectDir)package.json;$(ViewsProjectDir)package-lock.json;$(ViewsProjectDir)build.js;$(ViewsProjectDir)vite.config.ts" />
+    <ViewsSource Include="$(ViewsProjectDir)tsconfig.json;$(ViewsProjectDir)tsconfig.build.json" />
     <ViewsOutput Include="$(ViewsDistDir)month-overview.html;$(ViewsDistDir)cash-flow-forecast.html;$(ViewsDistDir)subscriptions.html" />
+    <!-- Seen by the fast up-to-date check of Visual Studio and by dotnet watch, which ignore custom item types. -->
+    <UpToDateCheckInput Include="@(ViewsSource)" />
+    <Watch Include="@(ViewsSource)" />
   </ItemGroup>
 
   <!-- Not in the design-time builds of the IDE, which must stay fast. -->
   <Target Name="CheckNodeForViews" Condition="'$(DesignTimeBuild)' != 'true'">
-    <Exec Command="node --version" ContinueOnError="true" StandardOutputImportance="low" IgnoreExitCode="true">
+    <Exec Command="node --version" ConsoleToMSBuild="true" IgnoreExitCode="true" StandardOutputImportance="low">
       <Output TaskParameter="ExitCode" PropertyName="NodeExitCode" />
+      <Output TaskParameter="ConsoleOutput" PropertyName="NodeVersion" />
     </Exec>
-    <Error Condition="'$(NodeExitCode)' != '0'" Text="Node.js 24 is required to build the MCP Apps views (src/Hestia.Room.Finance.Views): see the README." />
+    <Error Condition="'$(NodeExitCode)' != '0' or !$(NodeVersion.StartsWith('v24.'))"
+           Text="Node.js 24 is required to build the MCP Apps views (src/Hestia.Room.Finance.Views), found '$(NodeVersion)': see the README." />
   </Target>
 
-  <!-- npm ci only when the lock file is newer than the installed packages (npm writes node_modules/.package-lock.json). -->
+  <!--
+    npm ci only when the lock file is newer than the installed packages (npm writes node_modules/.package-lock.json).
+    ignore-scripts given explicitly: an inherited npm_config_ignore_scripts cannot turn the install scripts back on.
+  -->
   <Target Name="RestoreViews" DependsOnTargets="CheckNodeForViews" Condition="'$(DesignTimeBuild)' != 'true'"
           Inputs="$(ViewsProjectDir)package-lock.json" Outputs="$(ViewsProjectDir)node_modules\.package-lock.json">
-    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(ViewsProjectDir)" />
+    <Exec Command="npm ci --no-audit --no-fund --ignore-scripts" WorkingDirectory="$(ViewsProjectDir)" />
   </Target>
 
   <Target Name="BuildViews" BeforeTargets="BeforeBuild" DependsOnTargets="RestoreViews" Condition="'$(DesignTimeBuild)' != 'true'"
@@ -70,6 +79,11 @@
     <ItemGroup>
       <EmbeddedResource Include="@(ViewsOutput)" LogicalName="views/%(Filename)%(Extension)" WithCulture="false" />
     </ItemGroup>
+  </Target>
+
+  <!-- dotnet clean (and Rebuild) also empties the built views, which then build again. -->
+  <Target Name="CleanViews" AfterTargets="Clean">
+    <RemoveDir Directories="$(ViewsDistDir)" />
   </Target>
 
 </Project>

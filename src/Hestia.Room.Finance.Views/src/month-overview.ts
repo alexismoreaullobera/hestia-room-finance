@@ -1,5 +1,6 @@
 import type { MonthSummaryOutput, SummaryFigures } from "./shared/outputs";
-import { amount, card, element, type ViewDefinition } from "./shared/view";
+import { amount, card, element } from "./shared/dom";
+import type { ViewDefinition } from "./shared/view";
 import "./month-overview.css";
 
 /** The savings capacity of one reading, as falling due this month and on an average month. */

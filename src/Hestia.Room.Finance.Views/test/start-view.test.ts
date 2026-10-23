@@ -102,7 +102,7 @@ describe("startView", () => {
     expect(button("next").disabled).toBe(false);
   });
 
-  it("shows the last answer when a result of the agent arrives during a navigation", async () => {
+  it("lets a result of the agent win over a navigation still loading, and ignores its late answer", async () => {
     const app = fakeApp();
     let answer!: (value: { structuredContent: Data }) => void;
     app.callServerTool.mockReturnValue(new Promise(resolve => { answer = resolve; }));
@@ -111,10 +111,14 @@ describe("startView", () => {
     button("next").click();
 
     app.sendResult(result("2027-01"));
-    answer(result("2026-11"));
+    expect(byId("month").textContent).toBe("Janvier 2027");
+    expect(button("next").disabled).toBe(false);
 
-    await vi.waitFor(() => { expect(byId("month").textContent).toBe("Novembre 2026"); });
-    expect(render).toHaveBeenCalledTimes(3);
+    answer(result("2026-11"));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(byId("month").textContent).toBe("Janvier 2027");
+    expect(render).toHaveBeenCalledTimes(2);
   });
 
   it("says so when the connection to the host fails", async () => {

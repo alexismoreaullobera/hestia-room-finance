@@ -42,7 +42,7 @@ Each tool takes an optional `month` (`YYYY-MM`, the current month in Paris time 
 
 The views follow the host theme (light or dark), change month with their own tool (previous and next buttons, through `callServerTool`, without going through the agent), and never write HTML from data (text only, attributes through an allowlist).
 
-**Views project** (`Hestia.Room.Finance.Views`): TypeScript built with Vite and `vite-plugin-singlefile` into one self-contained HTML per view, the MCP Apps SDK (`@modelcontextprotocol/ext-apps`) included: no CDN, no third-party code loaded at runtime, and a CSP that declares no domain. `dotnet build` builds the views and embeds them in the MCP server.
+**Views project** (`Hestia.Room.Finance.Views`): TypeScript built with Vite and `vite-plugin-singlefile` into one self-contained HTML per view, the MCP Apps SDK (`@modelcontextprotocol/ext-apps`) included: no CDN, no third-party code loaded at runtime, and a CSP that declares no domain (no network access from a view; the requests to the host, such as opening a link, remain governed by the host). `dotnet build` builds the views and embeds them in the MCP server.
 
 | Month overview | Subscriptions |
 |---|---|
@@ -125,6 +125,7 @@ The views have their own tests and lint (also run by the CI):
 cd src/Hestia.Room.Finance.Views
 npm ci
 npm run lint
+npm run typecheck
 npm test
 ```
 

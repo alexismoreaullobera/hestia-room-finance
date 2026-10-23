@@ -1,5 +1,7 @@
 import type { CashFlowForecastOutput, DailyBalanceOutput, DebitOutput } from "./shared/outputs";
-import { amount, card, element, formatDay, formatEuros, svg, type ViewDefinition } from "./shared/view";
+import { amount, card, element, svg } from "./shared/dom";
+import { formatDay, formatEuros } from "./shared/format";
+import type { ViewDefinition } from "./shared/view";
 import "./cash-flow-forecast.css";
 
 // Margins of the drawing area, in pixels: the chart is drawn at the width of the view (one viewBox unit per
@@ -73,7 +75,8 @@ function summary(data: CashFlowForecastOutput): HTMLElement {
       element("strong", { className: "positive", text: "Pas d'alerte : " }),
       "le solde ne passe pas sous zéro ce mois-ci.");
   }
-  // The same reading as the text summary of the tool: computed once, by the server.
+  // The flags (hasAlert, startsOverdrawn, cashBuffer) are computed by the server. The wording mirrors the text summary
+  // of the tool (CashFlowForecastOutput.Describe): keep both in sync.
   const advice = data.startsOverdrawn
     ? "Le compte démarre déjà à découvert : les mouvements du mois ne le creusent pas davantage."
     : `Il faudrait démarrer le mois avec au moins ${formatEuros(data.cashBuffer)} pour l'éviter.`;
