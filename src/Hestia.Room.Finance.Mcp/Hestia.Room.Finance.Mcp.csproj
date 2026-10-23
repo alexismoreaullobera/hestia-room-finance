@@ -29,8 +29,10 @@
 
   <ItemGroup>
     <!-- MCP Apps views (ui:// resources) and the code they share are embedded in the assembly and served by the MCP server. -->
-    <EmbeddedResource Include="Views\*.html" />
-    <EmbeddedResource Include="Views\shared\*.css;Views\shared\*.js" />
+    <!-- Explicit resource names (views/..., views/shared/...): the default name depends on the root namespace and
+    rewrites folder names. WithCulture=false: a file such as view.fr.js stays in this assembly. -->
+    <EmbeddedResource Include="Views\*.html" LogicalName="views/%(Filename)%(Extension)" WithCulture="false" />
+    <EmbeddedResource Include="Views\shared\*.css;Views\shared\*.js" LogicalName="views/shared/%(Filename)%(Extension)" WithCulture="false" />
   </ItemGroup>
 
 </Project>

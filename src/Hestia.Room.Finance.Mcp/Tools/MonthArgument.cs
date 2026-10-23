@@ -4,7 +4,7 @@ using ModelContextProtocol;
 
 namespace Hestia.Room.Finance.Mcp.Tools;
 
-/// <summary>The optional <c>month</c> argument shared by the data tools.</summary>
+/// <summary>The optional <c>month</c> argument shared by the data tools and the view tools.</summary>
 internal static class MonthArgument
 {
     public const string Description = "Month to read, as YYYY-MM (for instance 2026-04). Defaults to the current month.";

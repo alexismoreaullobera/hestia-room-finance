@@ -95,20 +95,32 @@ body {
 .negative { color: var(--negative); }
 .positive { color: var(--positive); }
 .muted { color: var(--muted); }
+/* Key figures (card() in view.js): as many columns as fit, so the cards wrap in a narrow view instead of
+   overflowing. A view may set --card-min for wider cards. */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--card-min, 150px), 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
 .card {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
   padding: 12px;
-  margin-bottom: 12px;
 }
-.alert {
-  border: 1px solid var(--alert-line);
+.card .title { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.card .big { font-size: 22px; font-weight: 600; margin-top: 2px; }
+.card .detail { color: var(--muted); font-size: 12px; }
+
+/* State of the month: an alert, or a calm note when everything is fine. */
+.alert, .calm {
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: var(--alert-bg);
   padding: 10px 12px;
   margin-bottom: 12px;
 }
+.alert { border-color: var(--alert-line); background: var(--alert-bg); }
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 6px 8px; border-top: 1px solid var(--line); text-align: left; }
 th { color: var(--muted); font-weight: 500; font-size: 12px; }

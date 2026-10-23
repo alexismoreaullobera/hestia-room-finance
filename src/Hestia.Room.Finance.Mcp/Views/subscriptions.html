@@ -8,11 +8,6 @@
   <style>
     /* @shared view.css */
 
-    /* As many columns as fit: the cards wrap in a narrow view instead of overflowing. */
-    .totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }
-    .totals .card { margin: 0; }
-    .totals .title { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
-    .totals .big { font-size: 20px; font-weight: 600; margin-top: 2px; }
     /* The table scrolls on its own in a narrow view, the page does not. */
     .table-wrap { overflow-x: auto; }
     .detail { display: block; color: var(--muted); font-size: 12px; }
@@ -30,6 +25,8 @@
   <script type="module">
     /* @shared view.js */
 
+    // French names of the Frequency and Category enums: keep in sync with the domain (a test checks that every
+    // value is translated) and with FrenchText.FrequencyName on the server side.
     const frequencies = { Monthly: "mensuel", Quarterly: "trimestriel", Yearly: "annuel" };
     const categories = {
       Other: "Autre", Income: "Revenu", Housing: "Logement", Utilities: "Énergie", Telecom: "Télécom",
@@ -37,20 +34,14 @@
       Education: "Éducation", Savings: "Épargne", Taxes: "Impôts",
     };
 
-    function total(title, value) {
-      return element("div", { className: "card" },
-        element("div", { className: "title", text: title }),
-        element("div", { className: "big", text: value }));
-    }
-
     function subscriptionRow(subscription) {
       return element("tr", {},
         element("td", {},
-          document.createTextNode(subscription.name),
-          element("span", { className: "detail", text: categories[subscription.category] ?? subscription.category })),
+          subscription.name,
+          element("span", { className: "detail", text: translate(categories, subscription.category) })),
         element("td", { className: "amount" },
-          document.createTextNode(formatEuros(subscription.amount)),
-          element("span", { className: "detail", text: frequencies[subscription.frequency] ?? subscription.frequency })),
+          formatEuros(subscription.amount),
+          element("span", { className: "detail", text: translate(frequencies, subscription.frequency) })),
         amount(subscription.monthlyEquivalent, "td"),
         element("td", {
           className: subscription.dueDate ? "" : "muted",
@@ -63,7 +54,7 @@
     }
 
     await startView({
-      name: "Subscriptions",
+      name: "Abonnements",
       tool: "show_subscriptions",
       render: ({ subscriptions, monthlyTotal, yearlyTotal }, content) => {
         if (subscriptions.length === 0) {
@@ -71,10 +62,10 @@
           return;
         }
         content.append(
-          element("div", { className: "totals" },
-            total("Par mois", formatEuros(monthlyTotal)),
-            total("Par an", formatEuros(yearlyTotal)),
-            total("Abonnements", String(subscriptions.length))),
+          element("div", { className: "cards" },
+            card("Par mois", formatEuros(monthlyTotal)),
+            card("Par an", formatEuros(yearlyTotal)),
+            card("Abonnements", String(subscriptions.length))),
           element("div", { className: "table-wrap" },
             element("table", {},
               element("thead", {}, element("tr", {},
