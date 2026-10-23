@@ -1,4 +1,4 @@
-/* Shared by every view of the finance room (injected by the server in place of its marker). */
+/* Shared by every view of the finance room (imported by each view, inlined by the build). */
 
 /* Palette: the host theme wins (data-theme, set from the host context); the system setting otherwise. */
 :root {
@@ -95,7 +95,7 @@ body {
 .negative { color: var(--negative); }
 .positive { color: var(--positive); }
 .muted { color: var(--muted); }
-/* Key figures (card() in view.js): as many columns as fit, so the cards wrap in a narrow view instead of
+/* Key figures (card() in dom.ts): as many columns as fit, so the cards wrap in a narrow view instead of
    overflowing. A view may set --card-min for wider cards. */
 .cards {
   display: grid;

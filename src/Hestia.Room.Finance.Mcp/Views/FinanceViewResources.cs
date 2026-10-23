@@ -7,17 +7,15 @@ using ModelContextProtocol.Server;
 namespace Hestia.Room.Finance.Mcp.Views;
 
 /// <summary>
-/// MCP Apps UI resources (ui://) served by the finance room: one HTML view per view tool.
+/// MCP Apps UI resources (ui://) served by the finance room: one HTML view per view tool, built by the views project
+/// (src/Hestia.Room.Finance.Views) as a self-contained document (scripts, styles and App SDK inlined) and embedded in
+/// this assembly.
 /// </summary>
 public static class FinanceViewResources
 {
     public const string MonthOverviewUri = "ui://finance/month-overview.html";
     public const string CashFlowForecastUri = "ui://finance/cash-flow-forecast.html";
     public const string SubscriptionsUri = "ui://finance/subscriptions.html";
-
-    /// <summary>Where a view takes the code shared by every view (styles, then script), replaced at startup.</summary>
-    internal const string SharedStylesMarker = "/* @shared view.css */";
-    internal const string SharedScriptMarker = "/* @shared view.js */";
 
     private static readonly ViewDefinition[] Views =
     [
@@ -29,42 +27,16 @@ public static class FinanceViewResources
             "View of show_subscriptions: monthly and yearly totals, debits of the month and commitment ends."),
     ];
 
-    // Every external domain used by a view must be declared, otherwise the host CSP blocks it.
+    // No external domain: the views are self-contained, the App SDK included. With an empty CSP, the host applies the
+    // MCP Apps default: no fetch, XHR or WebSocket, no external script, style or image. The navigation of the frame
+    // and the requests to the host (open a link, send a message) are governed by the host, not by this CSP.
     private static readonly McpUiResourceMeta ViewUi = new()
     {
-        Csp = new McpUiResourceCsp { ResourceDomains = ["https://unpkg.com"] },
+        Csp = new McpUiResourceCsp(),
     };
 
-    public static IEnumerable<McpServerResource> Create()
-    {
-        var styles = LoadView("shared/view.css");
-        var script = LoadView("shared/view.js");
-
-        return [.. Views.Select(view => CreateResource(view, Compose(view.FileName, LoadView(view.FileName), styles, script)))];
-    }
-
-    /// <summary>
-    /// The view with the shared code in place of its markers: each view stays a single self-contained HTML document,
-    /// as MCP Apps expects, without copying the shared code into every file.
-    /// </summary>
-    internal static string Compose(string fileName, string html, string styles, string script)
-    {
-        // Exactly once: a missing marker drops the shared code, a duplicated one would inject it twice (twice the
-        // import of the SDK in the module). Checked at startup, so a broken view stops the server, naming the file.
-        RequireExactlyOnce(fileName, html, SharedStylesMarker);
-        RequireExactlyOnce(fileName, html, SharedScriptMarker);
-
-        return html.Replace(SharedStylesMarker, styles, StringComparison.Ordinal).Replace(SharedScriptMarker, script, StringComparison.Ordinal);
-    }
-
-    private static void RequireExactlyOnce(string fileName, string html, string marker)
-    {
-        var first = html.IndexOf(marker, StringComparison.Ordinal);
-        if (first < 0 || html.IndexOf(marker, first + marker.Length, StringComparison.Ordinal) >= 0)
-        {
-            throw new InvalidOperationException($"View '{fileName}' must contain '{marker}' exactly once.");
-        }
-    }
+    public static IEnumerable<McpServerResource> Create() =>
+        [.. Views.Select(view => CreateResource(view, LoadView(view.FileName)))];
 
     private static McpServerResource CreateResource(ViewDefinition view, string html) =>
         // McpApps.SetResourceUi only sets the template metadata, which is not exposed for a direct
@@ -96,11 +68,11 @@ public static class FinanceViewResources
 
     private static string LoadView(string path)
     {
-        // The LogicalName given in the csproj: views/month-overview.html, views/shared/view.css.
+        // The LogicalName given in the csproj: views/month-overview.html.
         var resourceName = $"views/{path}";
 
         using var stream = typeof(FinanceViewResources).Assembly.GetManifestResourceStream(resourceName)
-            ?? throw new InvalidOperationException($"Embedded view '{resourceName}' not found.");
+            ?? throw new InvalidOperationException($"Embedded view '{resourceName}' not found: build the views project (dotnet build does it).");
         using var reader = new StreamReader(stream);
         return reader.ReadToEnd();
     }

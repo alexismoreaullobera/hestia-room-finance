@@ -1,0 +1,21 @@
+{
+  "month": "2027-03",
+  "planned": {
+    "incomes": 2250.00,
+    "recurringExpenses": 1280.77,
+    "budgets": 530.00,
+    "savingsCapacity": 439.23,
+    "smoothedIncomes": 2250.00,
+    "smoothedRecurringExpenses": 1185.77,
+    "smoothedSavingsCapacity": 534.23
+  },
+  "actual": {
+    "incomes": 2250.00,
+    "recurringExpenses": 1280.77,
+    "budgets": 530.00,
+    "savingsCapacity": 439.23,
+    "smoothedIncomes": 2250.00,
+    "smoothedRecurringExpenses": 1185.77,
+    "smoothedSavingsCapacity": 534.23
+  }
+}

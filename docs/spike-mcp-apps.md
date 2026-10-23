@@ -2,7 +2,7 @@
 
 > Ticket: [#1](https://github.com/alexismoreaullobera/hestia-room-finance/issues/1) · Date: October 2026 · Status: **done, feasibility confirmed**
 >
-> **Replaced in T7** ([#16](https://github.com/alexismoreaullobera/hestia-room-finance/issues/16)): `show_balance`, its widget and the fake data are gone; the v1 views (`show_month_overview`, `show_cash_flow_forecast`, `show_subscriptions`) follow the same pipeline. This note is kept as the record of the spike and its pitfalls. Since then, also tested: tool arguments (`month`), view-to-server calls (`callServerTool` for the month navigation) and the host theme.
+> **Replaced in T7** ([#16](https://github.com/alexismoreaullobera/hestia-room-finance/issues/16)): `show_balance`, its widget and the fake data are gone; the v1 views (`show_month_overview`, `show_cash_flow_forecast`, `show_subscriptions`) follow the same pipeline. This note is kept as the record of the spike and its pitfalls. Since then, also tested: tool arguments (`month`), view-to-server calls (`callServerTool` for the month navigation) and the host theme. **Since T8** ([#17](https://github.com/alexismoreaullobera/hestia-room-finance/issues/17)), the SDK is no longer loaded from unpkg: the views are built with Vite and include it, and their CSP declares no domain (the CDN limit below is lifted).
 
 ## Goal
 

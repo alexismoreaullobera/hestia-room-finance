@@ -1,0 +1,10 @@
+.chart { width: 100%; height: auto; display: block; margin-bottom: 12px; }
+.chart .axis { fill: var(--muted); font-size: 11px; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .zero { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; }
+.chart .curve { fill: none; stroke: var(--accent); stroke-width: 2; }
+.chart .below { fill: var(--negative); opacity: .15; }
+.chart .low { fill: var(--negative); }
+.chart .day { fill: transparent; }
+.chart .day:hover { fill: var(--line); opacity: .4; }
+h2 { font-size: 14px; margin: 16px 0 4px; }

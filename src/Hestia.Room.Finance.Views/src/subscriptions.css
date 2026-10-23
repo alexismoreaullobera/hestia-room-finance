@@ -1,0 +1,3 @@
+/* The table scrolls on its own in a narrow view, the page does not. */
+.table-wrap { overflow-x: auto; }
+.detail { display: block; color: var(--muted); font-size: 12px; }

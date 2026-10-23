@@ -1,0 +1,51 @@
+{
+  "month": "2027-03",
+  "subscriptions": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "name": "Salle de sport",
+      "amount": 34.90,
+      "frequency": "Monthly",
+      "category": "Leisure",
+      "monthlyEquivalent": 34.90,
+      "yearlyCost": 418.80,
+      "dueDate": "2027-03-03",
+      "commitmentEndDate": "2027-05-31"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "name": "Box internet",
+      "amount": 29.99,
+      "frequency": "Monthly",
+      "category": "Telecom",
+      "monthlyEquivalent": 29.99,
+      "yearlyCost": 359.88,
+      "dueDate": "2027-03-08",
+      "commitmentEndDate": null
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "name": "Forfait mobile",
+      "amount": 12.99,
+      "frequency": "Monthly",
+      "category": "Telecom",
+      "monthlyEquivalent": 12.99,
+      "yearlyCost": 155.88,
+      "dueDate": "2027-03-08",
+      "commitmentEndDate": "2027-09-30"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000004",
+      "name": "Streaming vidéo",
+      "amount": 13.49,
+      "frequency": "Monthly",
+      "category": "Leisure",
+      "monthlyEquivalent": 13.49,
+      "yearlyCost": 161.88,
+      "dueDate": "2027-03-20",
+      "commitmentEndDate": null
+    }
+  ],
+  "monthlyTotal": 91.37,
+  "yearlyTotal": 1096.44
+}
