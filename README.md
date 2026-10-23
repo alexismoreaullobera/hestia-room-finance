@@ -40,7 +40,9 @@ Each tool takes an optional `month` (`YYYY-MM`, the current month in Paris time 
 | `show_cash_flow_forecast` | `ui://finance/cash-flow-forecast.html` | Alert, starting balance, low point, cash buffer, daily curve (hand-made SVG), contributing debits |
 | `show_subscriptions` | `ui://finance/subscriptions.html` | Monthly and yearly totals, each subscription with its debit of the month and its commitment end |
 
-The views follow the host theme (light or dark), change month with their own tool (previous and next buttons, through `callServerTool`, without going through the agent), and never write HTML from data (text only).
+The views follow the host theme (light or dark), change month with their own tool (previous and next buttons, through `callServerTool`, without going through the agent), and never write HTML from data (text only, attributes through an allowlist).
+
+**Views project** (`Hestia.Room.Finance.Views`): TypeScript built with Vite and `vite-plugin-singlefile` into one self-contained HTML per view, the MCP Apps SDK (`@modelcontextprotocol/ext-apps`) included: no CDN, no third-party code loaded at runtime, and a CSP that declares no domain. `dotnet build` builds the views and embeds them in the MCP server.
 
 | Month overview | Subscriptions |
 |---|---|
@@ -63,7 +65,7 @@ Hestia.Room.Finance.Domain          business rules and calculations, pure C#: no
 
 ## Quickstart
 
-**Prerequisites:** [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (the exact version is pinned in `global.json`), [Docker](https://www.docker.com/products/docker-desktop/) (local SQL Server and database tests) and [Node.js](https://nodejs.org/) (for the MCP Inspector only).
+**Prerequisites:** [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (the exact version is pinned in `global.json`), [Docker](https://www.docker.com/products/docker-desktop/) (local SQL Server and database tests) and [Node.js 24](https://nodejs.org/) (to build the views, run by `dotnet build`, and for the MCP Inspector).
 
 1. Clone, then choose a password for the local SQL Server (the `.env` file is never committed):
    ```bash
@@ -117,9 +119,19 @@ unset SA_PASSWORD
 dotnet test
 ```
 
+The views have their own tests and lint (also run by the CI):
+
+```bash
+cd src/Hestia.Room.Finance.Views
+npm ci
+npm run lint
+npm test
+```
+
 - **Domain**: every calculation rule of the [scope](docs/scope.md), with business-named tests; sensitive rules checked by mutation.
 - **Infrastructure**: domain ↔ row conversions and the schema checked offline from the EF Core model; then, on a real SQL Server (Testcontainers, one fresh migrated database per test): migrations, round trip of every entity, constraints, cascades, the month reader and the demo seeder.
-- **MCP server**: unit tests of the tool outputs and text summaries on plans built in memory, of the month argument and of the clock (month change in Paris time); then end-to-end tests on the `/mcp` endpoint with an in-memory server, a real SQL Server and a fixed clock: the four data tools (annotations, output schema, figures equal to the domain applied to the demo plan, tool errors), the three view tools (their `ui://` link, a result equal to their data tool) and views (MIME type, CSP, shared code injected, no HTML written from data, no domain outside the CSP, month navigation through their own tool), and host filtering. The widgets themselves were checked by hand in the MCP Inspector (light and dark, month navigation, narrow and wide); automated JavaScript tests come with the bundling of the widget SDK.
+- **MCP server**: unit tests of the tool outputs and text summaries on plans built in memory, of the month argument and of the clock (month change in Paris time); then end-to-end tests on the `/mcp` endpoint with an in-memory server, a real SQL Server and a fixed clock: the four data tools (annotations, output schema, figures equal to the domain applied to the demo plan, tool errors), the three view tools (their `ui://` link, a result equal to their data tool, valid and invalid months) and views (MIME type, self-contained: nothing loaded from outside, a CSP with no domain), and host filtering.
+- **Views** (Vitest with happy-dom, the SDK replaced by a fake one): formats and month navigation, `startView` (loading, tool errors, failed calls and connection, host theme, re-render on a width change only), text never written as markup and attributes outside the allowlist refused, the chart edge cases, and the three views rendered on JSON fixtures that a C# test keeps equal to the structured content of the tools. ESLint (with `eslint-plugin-no-unsanitized`) forbids every way of turning a string into markup or code.
 
 Tests use xUnit v3 on the Microsoft Testing Platform (declared in `global.json`).
 
@@ -145,7 +157,8 @@ Every change goes through a pull request: `main` is protected, and the CI (build
 ├─ src/
 │  ├─ Hestia.Room.Finance.Domain/          business rules and calculations
 │  ├─ Hestia.Room.Finance.Infrastructure/  EF Core: DbContext, Configurations/, Rows/
-│  └─ Hestia.Room.Finance.Mcp/             MCP server: Tools/ (and Outputs/), Time/, Views/ (widgets, and shared/ code)
+│  ├─ Hestia.Room.Finance.Mcp/             MCP server: Tools/ (and Outputs/), Time/, Views/ (serves the built views)
+│  └─ Hestia.Room.Finance.Views/           MCP Apps views: TypeScript (src/, shared/ kit), HTML entries (views/), tests (test/)
 ├─ tests/                                  one test project per project above, plus Hestia.Room.Finance.Testing (shared SQL Server fixture)
 ├─ docs/                                   scope and technical notes
 ├─ docker-compose.yml                      local SQL Server (password in .env, see .env.example)
