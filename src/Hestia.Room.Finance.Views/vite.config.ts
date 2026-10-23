@@ -1,4 +1,5 @@
-import { defineConfig } from "vite";
+// From vitest/config: the Vite configuration plus the test section.
+import { defineConfig } from "vitest/config";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
 // One build per view (see build.js): vite-plugin-singlefile inlines the scripts, the styles and the SDK into a

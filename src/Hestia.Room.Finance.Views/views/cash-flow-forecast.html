@@ -1,5 +1,25 @@
 <!doctype html>
 <html lang="fr">
-<head><meta charset="utf-8"><title>cash-flow-forecast</title></head>
-<body><main id="content"></main></body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Prévisionnel de trésorerie</title>
+</head>
+<body>
+  <header class="view-header">
+    <button id="previous" type="button" aria-label="Mois précédent">‹</button>
+    <h1><span class="label">Prévisionnel de trésorerie</span><span id="month">…</span></h1>
+    <button id="next" type="button" aria-label="Mois suivant">›</button>
+  </header>
+  <p class="status" id="status">En attente des données…</p>
+  <main id="content" hidden></main>
+
+  <script type="module">
+    import { startView } from "../src/shared/view";
+    import { cashFlowForecast } from "../src/cash-flow-forecast";
+
+    void startView(cashFlowForecast);
+  </script>
+</body>
 </html>
