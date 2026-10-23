@@ -1,12 +1,11 @@
 using Hestia.Room.Finance.Domain;
 using Hestia.Room.Finance.Infrastructure.Rows;
+using static Hestia.Room.Finance.Infrastructure.Tests.InfraTestData;
 
 namespace Hestia.Room.Finance.Infrastructure.Tests.Rows;
 
 public class RowMappingTests
 {
-    private static readonly YearMonth April = new(2026, 4);
-
     [Fact]
     public void RecurringLine_WithEveryField_SurvivesTheRoundTrip()
     {
@@ -109,20 +108,5 @@ public class RowMappingTests
         var row = new MonthPlanRow { Month = new DateOnly(2026, 4, 15), StartingBalance = 0m };
 
         Assert.Throws<InvalidOperationException>(() => row.ToDomain());
-    }
-
-    private static void AssertSameLine(RecurringLine expected, RecurringLine actual)
-    {
-        Assert.Equal(expected.Id, actual.Id);
-        Assert.Equal(expected.Kind, actual.Kind);
-        Assert.Equal(expected.Name, actual.Name);
-        Assert.Equal(expected.Amount, actual.Amount);
-        Assert.Equal(expected.Frequency, actual.Frequency);
-        Assert.Equal(expected.DayOfMonth, actual.DayOfMonth);
-        Assert.Equal(expected.AnchorMonth, actual.AnchorMonth);
-        Assert.Equal(expected.StartDate, actual.StartDate);
-        Assert.Equal(expected.EndDate, actual.EndDate);
-        Assert.Equal(expected.Category, actual.Category);
-        Assert.Equal(expected.Subscription, actual.Subscription);
     }
 }

@@ -41,15 +41,15 @@ public class CentsTests
         Assert.Equal("startingBalance", Assert.Throws<ArgumentException>(() => new MonthPlan(April, FractionOfACent)).ParamName);
     }
 
-    [Theory]
-    [InlineData(650)]
-    [InlineData(15.9)]
-    [InlineData(13.49)]
-    public void Amounts_WithAtMostTwoDecimals_AreValid(double amount)
-    {
-        // double here only to write the cases: converted to decimal exactly (one or two decimals).
-        var line = new RecurringLine(Guid.NewGuid(), FlowKind.Expense, "Line", (decimal)amount, Frequency.Monthly, 5, LongAgo);
+    // decimal is not allowed in attributes (InlineData): the cases are written in a TheoryData instead.
+    public static TheoryData<decimal> AmountsInCents => [650m, 15.9m, 13.49m, 12.340m];
 
-        Assert.Equal((decimal)amount, line.Amount);
+    [Theory]
+    [MemberData(nameof(AmountsInCents))] // 12.340m: three digits after the point, but a whole number of cents
+    public void Amounts_WithAtMostTwoDecimals_AreValid(decimal amount)
+    {
+        var line = new RecurringLine(Guid.NewGuid(), FlowKind.Expense, "Line", amount, Frequency.Monthly, 5, LongAgo);
+
+        Assert.Equal(amount, line.Amount);
     }
 }

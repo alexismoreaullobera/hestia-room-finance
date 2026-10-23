@@ -2,6 +2,7 @@ using Hestia.Room.Finance.Domain;
 using Hestia.Room.Finance.Infrastructure.Rows;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using static Hestia.Room.Finance.Infrastructure.Tests.InfraTestData;
 
 namespace Hestia.Room.Finance.Infrastructure.Tests.Database;
 
@@ -9,9 +10,6 @@ namespace Hestia.Room.Finance.Infrastructure.Tests.Database;
 [Collection(SqlServerCollection.Name)]
 public class DatabaseTests(SqlServerFixture sqlServer)
 {
-    private static readonly YearMonth April = new(2026, 4);
-    private static CancellationToken Token => TestContext.Current.CancellationToken;
-
     [Fact]
     public async Task Migrations_ApplyOnAnEmptyDatabase_WithTheHistoryInTheFinanceSchema()
     {
@@ -28,10 +26,11 @@ public class DatabaseTests(SqlServerFixture sqlServer)
     public async Task EveryEntity_SurvivesARoundTripThroughTheDatabase()
     {
         var options = await sqlServer.CreateMigratedDatabaseAsync();
-        var line = new RecurringLine(Guid.CreateVersion7(), FlowKind.Expense, "Forfait mobile", 15.99m, Frequency.Quarterly,
+        // Accented names: an ASCII-only (non Unicode) column would lose them.
+        var line = new RecurringLine(Guid.CreateVersion7(), FlowKind.Expense, "Assurance téléphone", 15.99m, Frequency.Quarterly,
             dayOfMonth: 31, startDate: new DateOnly(2025, 1, 15), anchorMonth: 2, endDate: new DateOnly(2027, 1, 31),
             category: Category.Telecom, subscription: new SubscriptionInfo(new DateOnly(2026, 12, 31)));
-        var budget = new Budget(Guid.CreateVersion7(), "Courses", 212.40m);
+        var budget = NewBudget("Épicerie", 212.40m);
         var plan = new MonthPlan(April, -30.50m);
         var actual = new BudgetActual(budget.Id, April, 0m);
         var skipped = RecurringOverride.Skipped(line.Id, April);
@@ -49,10 +48,9 @@ public class DatabaseTests(SqlServerFixture sqlServer)
 
         // A new context: the values come back from SQL Server, not from EF Core's memory.
         await using var read = new FinanceDbContext(options);
-        var lineBack = (await read.RecurringLines.SingleAsync(Token)).ToDomain();
-        Assert.Equal((line.Name, line.Amount, line.Frequency, line.DayOfMonth, line.AnchorMonth, line.StartDate, line.EndDate, line.Category, line.Subscription),
-            (lineBack.Name, lineBack.Amount, lineBack.Frequency, lineBack.DayOfMonth, lineBack.AnchorMonth, lineBack.StartDate, lineBack.EndDate, lineBack.Category, lineBack.Subscription));
-        Assert.Equal(212.40m, (await read.Budgets.SingleAsync(Token)).ToDomain().PlannedAmount);
+        AssertSameLine(line, (await read.RecurringLines.SingleAsync(Token)).ToDomain());
+        var budgetBack = (await read.Budgets.SingleAsync(Token)).ToDomain();
+        Assert.Equal((budget.Id, budget.Name, budget.PlannedAmount), (budgetBack.Id, budgetBack.Name, budgetBack.PlannedAmount));
         Assert.Equal(plan, (await read.MonthPlans.SingleAsync(Token)).ToDomain());
         Assert.Equal(actual, (await read.BudgetActuals.SingleAsync(Token)).ToDomain());
         Assert.Equal([skipped, corrected], (await read.RecurringOverrides.OrderBy(o => o.Month).ToListAsync(Token)).Select(o => o.ToDomain()));
@@ -75,7 +73,7 @@ public class DatabaseTests(SqlServerFixture sqlServer)
     public async Task TwoActualsForTheSameBudgetAndMonth_AreRejected()
     {
         var options = await sqlServer.CreateMigratedDatabaseAsync();
-        var budget = new Budget(Guid.CreateVersion7(), "Courses", 200m);
+        var budget = NewBudget("Courses", 200m);
         await using (var first = new FinanceDbContext(options))
         {
             first.Budgets.Add(budget.ToRow());
@@ -87,26 +85,37 @@ public class DatabaseTests(SqlServerFixture sqlServer)
         await using var second = new FinanceDbContext(options);
         second.BudgetActuals.Add(new BudgetActual(budget.Id, April, 120m).ToRow());
 
-        await Assert.ThrowsAsync<DbUpdateException>(() => second.SaveChangesAsync(Token));
+        var error = await Assert.ThrowsAsync<DbUpdateException>(() => second.SaveChangesAsync(Token));
+
+        // 2627: primary key violation, and not any other failure of the save.
+        Assert.Equal(2627, Assert.IsType<SqlException>(error.InnerException).Number);
     }
 
-    [Fact]
-    public async Task CheckConstraint_RejectsANegativeAmountWrittenOutsideTheDomain()
+    [Theory]
+    [InlineData("INSERT INTO finance.Budgets (Id, Name, PlannedAmount) VALUES (NEWID(), 'Courses', -200)",
+        "CK_Budgets_PlannedAmount")]
+    [InlineData("INSERT INTO finance.RecurringLines (Id, Kind, Name, Amount, Frequency, DayOfMonth, StartDate, Category, IsSubscription) "
+        + "VALUES (NEWID(), 'Expense', 'Loyer', 650, 'Monthly', 32, '2025-01-01', 'Housing', 0)",
+        "CK_RecurringLines_DayOfMonth")]
+    [InlineData("INSERT INTO finance.MonthPlans (Month, StartingBalance) VALUES ('2026-04-15', 0)",
+        "CK_MonthPlans_Month")]
+    public async Task CheckConstraints_RejectAValueWrittenOutsideTheDomain(string insert, string constraint)
     {
         await using var context = new FinanceDbContext(await sqlServer.CreateMigratedDatabaseAsync());
 
-        // Bypasses the domain on purpose, as a manual edit of the database would.
-        var error = await Assert.ThrowsAsync<SqlException>(() => context.Database.ExecuteSqlAsync(
-            $"INSERT INTO finance.Budgets (Id, Name, PlannedAmount) VALUES ({Guid.CreateVersion7()}, 'Courses', -200)", Token));
+        // Bypasses the domain on purpose, as a manual edit of the database would. Constant SQL, no user input.
+        var error = await Assert.ThrowsAsync<SqlException>(() => context.Database.ExecuteSqlRawAsync(insert, Token));
 
-        Assert.Contains("CK_Budgets_PlannedAmount", error.Message);
+        // 547: constraint violation; the message names which one.
+        Assert.Equal(547, error.Number);
+        Assert.Contains(constraint, error.Message);
     }
 
     [Fact]
     public async Task DeletingABudget_DeletesItsActuals()
     {
         var options = await sqlServer.CreateMigratedDatabaseAsync();
-        var budget = new Budget(Guid.CreateVersion7(), "Courses", 200m);
+        var budget = NewBudget("Courses", 200m);
         await using (var write = new FinanceDbContext(options))
         {
             write.Budgets.Add(budget.ToRow());

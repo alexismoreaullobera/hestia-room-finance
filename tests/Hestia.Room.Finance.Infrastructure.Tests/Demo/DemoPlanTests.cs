@@ -37,10 +37,24 @@ public class DemoPlanTests
         Assert.All(Demo.Overrides, o => Assert.Contains(Demo.Lines, line => line.Id == o.LineId));
     }
 
-    [Fact]
-    public void Demo_CurrentMonth_ShowsALowPointAndAnAlertWithItsDebits()
+    /// <summary>Two years of current months, from March 2027: the demo runs on the real current month, whatever it is.</summary>
+    public static TheoryData<int, int> CurrentMonths()
     {
-        var month = new FinanceMonth(Demo.MonthPlans.Single(p => p.Month == CurrentMonth), Demo.Lines, Demo.Budgets, [], []);
+        var data = new TheoryData<int, int>();
+        foreach (var month in Enumerable.Range(0, 24).Select(i => new YearMonth(2027, 3).AddMonths(i)))
+        {
+            data.Add(month.Year, month.Month);
+        }
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(CurrentMonths))] // includes February 2028, a leap year
+    public void Demo_AnyCurrentMonth_ShowsALowPointAndAnAlertWithItsDebits(int year, int monthNumber)
+    {
+        var currentMonth = new YearMonth(year, monthNumber);
+        var demo = DemoPlan.For(currentMonth);
+        var month = new FinanceMonth(demo.MonthPlans.Single(p => p.Month == currentMonth), demo.Lines, demo.Budgets, [], []);
 
         var forecast = month.Forecast();
 

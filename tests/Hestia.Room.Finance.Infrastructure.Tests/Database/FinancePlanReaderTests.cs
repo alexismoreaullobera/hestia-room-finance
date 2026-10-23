@@ -1,28 +1,47 @@
 using Hestia.Room.Finance.Domain;
 using Hestia.Room.Finance.Infrastructure.Rows;
 using Microsoft.EntityFrameworkCore;
+using static Hestia.Room.Finance.Infrastructure.Tests.InfraTestData;
 
 namespace Hestia.Room.Finance.Infrastructure.Tests.Database;
 
 [Collection(SqlServerCollection.Name)]
 public class FinancePlanReaderTests(SqlServerFixture sqlServer)
 {
-    private static readonly YearMonth April = new(2026, 4);
     private static readonly YearMonth May = new(2026, 5);
-    private static CancellationToken Token => TestContext.Current.CancellationToken;
 
-    private readonly RecurringLine _rent = Line("Loyer", start: new DateOnly(2025, 1, 1));
-    private readonly RecurringLine _gymEndedInMarch = Line("Salle de sport", start: new DateOnly(2025, 1, 1), end: new DateOnly(2026, 3, 31));
-    private readonly RecurringLine _gymEndingInApril = Line("Piscine", start: new DateOnly(2025, 1, 1), end: new DateOnly(2026, 4, 3));
-    private readonly RecurringLine _startingInMay = Line("Streaming", start: new DateOnly(2026, 5, 1));
-    private readonly Budget _groceries = new(Guid.CreateVersion7(), "Courses", 200m);
+    private readonly RecurringLine _rent = Expense("Loyer", 650m);
+    private readonly RecurringLine _endedInMarch = Expense("Salle de sport", 30m, end: new DateOnly(2026, 3, 31));
+    // The two inclusive bounds: a line ending on the first day of the month, one starting on its last day.
+    private readonly RecurringLine _endingOnAprilFirst = Expense("Piscine", 30m, day: 1, end: new DateOnly(2026, 4, 1));
+    private readonly RecurringLine _startingOnAprilLast = Expense("Presse", 9.99m, day: 30, start: new DateOnly(2026, 4, 30));
+    private readonly RecurringLine _startingInMay = Expense("Streaming", 13.49m, start: new DateOnly(2026, 5, 1));
+    private readonly Budget _groceries = NewBudget("Courses", 200m);
+
+    private RecurringLine[] AllLines => [_rent, _endedInMarch, _endingOnAprilFirst, _startingOnAprilLast, _startingInMay];
 
     [Fact]
     public async Task LoadMonth_ReturnsTheLinesActiveDuringTheMonth()
     {
         var month = await LoadAprilAsync();
 
-        Assert.Equal(["Loyer", "Piscine"], month.Lines.Select(l => l.Name).Order());
+        Assert.Equal(["Loyer", "Piscine", "Presse"], month.Lines.Select(l => l.Name).Order());
+    }
+
+    [Theory]
+    [InlineData(3)]
+    [InlineData(4)]
+    [InlineData(5)]
+    public async Task LoadMonth_FiltersTheLinesLikeTheDomain(int monthNumber)
+    {
+        // The SQL filter duplicates RecurringLine.IsActiveIn: both must keep exactly the same lines.
+        var yearMonth = new YearMonth(2026, monthNumber);
+        var options = await SeedAsync();
+        await using var context = new FinanceDbContext(options);
+
+        var month = await new FinancePlanReader(context).LoadMonthAsync(yearMonth, Token);
+
+        Assert.Equal(AllLines.Where(l => l.IsActiveIn(yearMonth)).Select(l => l.Id).Order(), month.Lines.Select(l => l.Id).Order());
     }
 
     [Fact]
@@ -57,7 +76,7 @@ public class FinancePlanReaderTests(SqlServerFixture sqlServer)
         var month = await LoadAprilAsync();
 
         // The rent override (670 € instead of 650 €) and the groceries actual (235 €) are taken into account.
-        Assert.Equal(670m + 30m, month.ActualSummary().CashRecurringExpenses);
+        Assert.Equal(670m + 30m + 9.99m, month.ActualSummary().CashRecurringExpenses);
         Assert.Equal(235m, month.ActualSummary().BudgetsTotal);
         Assert.Equal(150m, month.Forecast().StartingBalance);
     }
@@ -73,7 +92,7 @@ public class FinancePlanReaderTests(SqlServerFixture sqlServer)
     {
         var options = await sqlServer.CreateMigratedDatabaseAsync();
         await using var context = new FinanceDbContext(options);
-        context.RecurringLines.AddRange(new[] { _rent, _gymEndedInMarch, _gymEndingInApril, _startingInMay }.Select(l => l.ToRow()));
+        context.RecurringLines.AddRange(AllLines.Select(l => l.ToRow()));
         context.Budgets.Add(_groceries.ToRow());
         context.MonthPlans.Add(new MonthPlan(April, 150m).ToRow());
         context.BudgetActuals.AddRange(new BudgetActual(_groceries.Id, April, 235m).ToRow(), new BudgetActual(_groceries.Id, May, 999m).ToRow());
@@ -83,7 +102,4 @@ public class FinancePlanReaderTests(SqlServerFixture sqlServer)
         await context.SaveChangesAsync(Token);
         return options;
     }
-
-    private static RecurringLine Line(string name, DateOnly start, DateOnly? end = null) =>
-        new(Guid.CreateVersion7(), FlowKind.Expense, name, name == "Loyer" ? 650m : 30m, Frequency.Monthly, 2, start, endDate: end);
 }
