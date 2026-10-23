@@ -103,8 +103,9 @@ async function startView(view) {
     monthTitle.textContent = formatMonth(data.month);
     setStatus("");
     content.replaceChildren();
-    view.render(data, content);
+    // Visible before rendering, so that a view can measure its width (the chart draws at the real size).
     content.hidden = false;
+    view.render(data, content);
   }
 
   async function goTo(month) {

@@ -40,8 +40,9 @@
     /* @shared view.js */
 
     const SVG = "http://www.w3.org/2000/svg";
-    // Drawing area, in viewBox units: the chart scales to the width of the view.
-    const WIDTH = 640, HEIGHT = 220, LEFT = 72, RIGHT = 12, TOP = 12, BOTTOM = 24;
+    // Margins of the drawing area, in pixels: the chart is drawn at the width of the view (one viewBox unit per
+    // pixel), so its texts keep their size on a wide screen instead of growing with it.
+    const HEIGHT = 240, LEFT = 72, RIGHT = 12, TOP = 12, BOTTOM = 24, MIN_WIDTH = 320;
 
     /** An SVG element; text through textContent only, as for HTML elements. */
     function svg(tag, attributes = {}, ...children) {
@@ -65,7 +66,8 @@
     }
 
     /** The end-of-day balance of every day, the zero line, the part below zero and the low point. */
-    function chart(days, lowPoint) {
+    function chart(days, lowPoint, width) {
+      const WIDTH = Math.max(MIN_WIDTH, Math.floor(width));
       const balances = days.map(d => d.balance);
       const min = Math.min(0, ...balances);
       const max = Math.max(0, ...balances);
@@ -102,7 +104,9 @@
       const last = days.length - 1;
       days.forEach((d, i) => {
         if ((i % 7 === 0 && last - i > 3) || i === last) {
-          chartNode.append(svgText(formatDay(d.date), { class: "axis", x: x(i), y: HEIGHT - 6, "text-anchor": "middle" }));
+          // The first and last dates are anchored inside the frame, not cut at its edges.
+          const anchor = i === 0 ? "start" : i === last ? "end" : "middle";
+          chartNode.append(svgText(formatDay(d.date), { class: "axis", x: x(i), y: HEIGHT - 6, "text-anchor": anchor }));
         }
       });
 
@@ -165,7 +169,7 @@
             figure("Solde de départ", data.startingBalance, "au début du mois"),
             figure("Point bas", data.lowPoint.balance, `le ${formatDay(data.lowPoint.date)}`),
             figure("Coussin nécessaire", data.cashBuffer, "pour ne jamais passer sous zéro")),
-          chart(data.days, data.lowPoint),
+          chart(data.days, data.lowPoint, content.clientWidth),
           ...debits(data.contributingDebits));
       },
     });
