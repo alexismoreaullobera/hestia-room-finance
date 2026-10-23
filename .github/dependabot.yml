@@ -18,6 +18,24 @@ updates:
     commit-message:
       prefix: deps
 
+  # npm packages of the MCP Apps views (exact versions in package.json and the lock file).
+  - package-ecosystem: npm
+    directory: /src/Hestia.Room.Finance.Views
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "06:00"
+      timezone: Europe/Paris
+    # Supply chain: a new version is proposed only once it has been published for 7 days, so that a compromised
+    # release has time to be detected and pulled before it reaches the repository.
+    cooldown:
+      default-days: 7
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: deps
+
   # .NET SDK pinned in global.json. SDK releases mostly land on Patch Tuesday, hence Wednesday.
   - package-ecosystem: dotnet-sdk
     directory: /

@@ -22,7 +22,7 @@ jobs:
   build-and-test:
     name: Build and test
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       # Actions are pinned to a full commit SHA (immutable), the version is kept in a comment.
       # Dependabot updates both.
@@ -38,6 +38,28 @@ jobs:
           # NuGet packages cached, keyed on the lock files.
           cache: true
           cache-dependency-path: "**/packages.lock.json"
+
+      - name: Setup Node (version from the views project)
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: src/Hestia.Room.Finance.Views/.nvmrc
+          # npm packages cached, keyed on the lock file.
+          cache: npm
+          cache-dependency-path: src/Hestia.Room.Finance.Views/package-lock.json
+
+      # The views (TypeScript, Vite): exact lock file, no install script (.npmrc), lint and tests before the .NET
+      # build, which then builds and embeds them.
+      - name: Install the views dependencies
+        working-directory: src/Hestia.Room.Finance.Views
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint the views
+        working-directory: src/Hestia.Room.Finance.Views
+        run: npm run lint
+
+      - name: Test the views
+        working-directory: src/Hestia.Room.Finance.Views
+        run: npm test
 
       # --locked-mode: fails if a dependency differs from packages.lock.json (version or content hash).
       - name: Restore
