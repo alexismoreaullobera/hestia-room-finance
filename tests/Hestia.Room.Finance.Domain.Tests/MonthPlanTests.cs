@@ -17,6 +17,28 @@ public class MonthPlanTests
         Assert.Equal(-100m, new MonthPlan(April, -100m).StartingBalance);
     }
 
+    // decimal is not allowed in attributes (InlineData): the cases are written in a TheoryData instead.
+    public static TheoryData<decimal> BoundaryBalances => [999_999_999.99m, -999_999_999.99m];
+
+    public static TheoryData<decimal> BalancesTooLarge => [1_000_000_000m, -1_000_000_000m, decimal.MaxValue, decimal.MinValue];
+
+    [Theory]
+    [MemberData(nameof(BoundaryBalances))]
+    public void StartingBalance_UpToTheBound_IsValid(decimal balance)
+    {
+        Assert.Equal(balance, new MonthPlan(April, balance).StartingBalance);
+    }
+
+    [Theory]
+    [MemberData(nameof(BalancesTooLarge))]
+    public void StartingBalance_BeyondTheBound_Throws(decimal balance)
+    {
+        // Written as literals, not with Guard.MaxAmount: the bound is a rule of the room, changing it must break a test.
+        var error = Assert.Throws<ArgumentOutOfRangeException>(() => new MonthPlan(April, balance));
+
+        Assert.Equal("startingBalance", error.ParamName);
+    }
+
     [Fact]
     public void Equality_IsByValue()
     {

@@ -9,6 +9,7 @@ public sealed record MonthPlan
     public MonthPlan(YearMonth month, decimal startingBalance = 0m)
     {
         Guard.ThrowIfNotCents(startingBalance);
+        Guard.ThrowIfTooLarge(startingBalance);
 
         Month = month;
         StartingBalance = startingBalance;
