@@ -1,16 +1,46 @@
 /* Shared by every view of the finance room (injected by the server in place of its marker). */
+
+/* Palette: the host theme wins (data-theme, set from the host context); the system setting otherwise. */
 :root {
   --bg: #ffffff;
   --fg: #1f2328;
   --muted: #656d76;
+  --line: #d0d7de;
+  --surface: #f6f8fa;
+  --accent: #0969da;
+  --positive: #1a7f37;
+  --negative: #cf222e;
+  --alert-bg: #ffebe9;
+  --alert-line: #ff8182;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0d1117;
     --fg: #e6edf3;
     --muted: #8d96a0;
+    --line: #30363d;
+    --surface: #161b22;
+    --accent: #4493f8;
+    --positive: #3fb950;
+    --negative: #f85149;
+    --alert-bg: #3c1618;
+    --alert-line: #8e1519;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #0d1117;
+  --fg: #e6edf3;
+  --muted: #8d96a0;
+  --line: #30363d;
+  --surface: #161b22;
+  --accent: #4493f8;
+  --positive: #3fb950;
+  --negative: #f85149;
+  --alert-bg: #3c1618;
+  --alert-line: #8e1519;
+}
+
+* { box-sizing: border-box; }
 body {
   margin: 0;
   padding: 16px;
@@ -18,4 +48,68 @@ body {
   color: var(--fg);
   font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
-.status { color: var(--muted); }
+[hidden] { display: none !important; }
+
+/* Header: the month shown, with the previous and next month buttons. */
+.view-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.view-header h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+}
+.view-header .label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.view-header button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.view-header button:hover:not(:disabled) { border-color: var(--accent); }
+.view-header button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.view-header button:disabled { opacity: .4; cursor: default; }
+
+.status { color: var(--muted); margin: 8px 0; }
+.status.error { color: var(--negative); }
+
+/* Building blocks of the views. */
+.amount { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.negative { color: var(--negative); }
+.positive { color: var(--positive); }
+.muted { color: var(--muted); }
+.card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.alert {
+  border: 1px solid var(--alert-line);
+  border-radius: 8px;
+  background: var(--alert-bg);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 6px 4px; border-top: 1px solid var(--line); text-align: left; }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+td.amount, th.amount { text-align: right; }

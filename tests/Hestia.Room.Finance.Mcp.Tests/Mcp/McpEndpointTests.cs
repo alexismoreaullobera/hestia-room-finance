@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 
@@ -96,6 +97,39 @@ public class McpEndpointTests(McpServerFixture mcp)
         Assert.DoesNotContain("@shared", html);
         Assert.Contains("import { App } from", html);
         Assert.Contains("startView(", html);
+    }
+
+    [Theory]
+    [MemberData(nameof(ViewUris))]
+    public async Task AView_NeverWritesHtmlFromData(string viewUri)
+    {
+        // Tool data is untrusted (a name typed by the user, prompt injection): views set textContent only.
+        var html = (string)(await ReadViewAsync(viewUri))["text"]!;
+
+        Assert.All(new[] { "innerHTML", "outerHTML", "insertAdjacentHTML", "document.write" },
+            api => Assert.DoesNotContain(api, html));
+    }
+
+    [Theory]
+    [MemberData(nameof(ViewUris))]
+    public async Task AView_LoadsNothingFromADomainOutsideItsCsp(string viewUri)
+    {
+        var contents = await ReadViewAsync(viewUri);
+        var declared = ResourceDomains(contents).ToHashSet();
+
+        var used = Regex.Matches((string)contents["text"]!, @"https://[A-Za-z0-9.-]+").Select(m => m.Value).Distinct();
+
+        Assert.All(used, origin => Assert.Contains(origin, declared));
+    }
+
+    [Theory]
+    [MemberData(nameof(ViewToolsAndViews))]
+    public async Task AView_ChangesMonthThroughItsOwnTool(string viewTool, string viewUri)
+    {
+        // The previous and next buttons call this tool with the month: it must be the tool that links to the view.
+        var html = (string)(await ReadViewAsync(viewUri))["text"]!;
+
+        Assert.Contains($"tool: \"{viewTool}\"", html);
     }
 
     [Fact]

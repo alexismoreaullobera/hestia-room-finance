@@ -10,16 +10,22 @@
   </style>
 </head>
 <body>
-  <h1 id="month">Synthèse du mois</h1>
+  <header class="view-header">
+    <button id="previous" type="button" aria-label="Mois précédent">‹</button>
+    <h1><span class="label">Synthèse du mois</span><span id="month">…</span></h1>
+    <button id="next" type="button" aria-label="Mois suivant">›</button>
+  </header>
   <p class="status" id="status">En attente des données…</p>
+  <main id="content" hidden></main>
 
   <script type="module">
     /* @shared view.js */
 
     await startView({
       name: "Month overview",
-      render: (data) => {
-        document.getElementById("month").textContent = `Synthèse du mois : ${data.month}`;
+      tool: "show_month_overview",
+      render: (data, content) => {
+        content.append(element("p", { className: "muted", text: "Vue en construction." }));
       },
     });
   </script>

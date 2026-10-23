@@ -10,16 +10,22 @@
   </style>
 </head>
 <body>
-  <h1 id="month">Abonnements</h1>
+  <header class="view-header">
+    <button id="previous" type="button" aria-label="Mois précédent">‹</button>
+    <h1><span class="label">Abonnements</span><span id="month">…</span></h1>
+    <button id="next" type="button" aria-label="Mois suivant">›</button>
+  </header>
   <p class="status" id="status">En attente des données…</p>
+  <main id="content" hidden></main>
 
   <script type="module">
     /* @shared view.js */
 
     await startView({
       name: "Subscriptions",
-      render: (data) => {
-        document.getElementById("month").textContent = `Abonnements : ${data.month}`;
+      tool: "show_subscriptions",
+      render: (data, content) => {
+        content.append(element("p", { className: "muted", text: "Vue en construction." }));
       },
     });
   </script>
