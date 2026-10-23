@@ -15,7 +15,10 @@ export function formatEuros(amount: number): string {
 /** "2026-10" -> "Octobre 2026". */
 export function formatMonth(month: string): string {
   const [year = 0, monthNumber = 1] = month.split("-").map(Number);
-  const name = monthNames.format(new Date(Date.UTC(year, monthNumber - 1, 1)));
+  // setUTCFullYear, not Date.UTC: Date.UTC reads the years 0 to 99 as 1900 to 1999.
+  const date = new Date(0);
+  date.setUTCFullYear(year, monthNumber - 1, 1);
+  const name = monthNames.format(date);
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 

@@ -1,0 +1,179 @@
+{
+  "month": "2027-03",
+  "startingBalance": 400.00,
+  "lowPoint": {
+    "date": "2027-03-27",
+    "balance": -1192.41
+  },
+  "cashBuffer": 1592.41,
+  "hasAlert": true,
+  "startsOverdrawn": false,
+  "contributingDebits": [
+    {
+      "name": "Abonnement transports",
+      "date": "2027-03-01",
+      "amount": 86.40
+    },
+    {
+      "name": "Salle de sport",
+      "date": "2027-03-03",
+      "amount": 34.90
+    },
+    {
+      "name": "Loyer",
+      "date": "2027-03-05",
+      "amount": 720.00
+    },
+    {
+      "name": "Box internet",
+      "date": "2027-03-08",
+      "amount": 29.99
+    },
+    {
+      "name": "Forfait mobile",
+      "date": "2027-03-08",
+      "amount": 12.99
+    },
+    {
+      "name": "\u00C9lectricit\u00E9",
+      "date": "2027-03-12",
+      "amount": 68.00
+    },
+    {
+      "name": "Assurance auto",
+      "date": "2027-03-15",
+      "amount": 165.00
+    },
+    {
+      "name": "Streaming vid\u00E9o",
+      "date": "2027-03-20",
+      "amount": 13.49
+    }
+  ],
+  "days": [
+    {
+      "date": "2027-03-01",
+      "balance": 296.48
+    },
+    {
+      "date": "2027-03-02",
+      "balance": 279.36
+    },
+    {
+      "date": "2027-03-03",
+      "balance": 227.34
+    },
+    {
+      "date": "2027-03-04",
+      "balance": 210.23
+    },
+    {
+      "date": "2027-03-05",
+      "balance": -526.88
+    },
+    {
+      "date": "2027-03-06",
+      "balance": -543.99
+    },
+    {
+      "date": "2027-03-07",
+      "balance": -561.10
+    },
+    {
+      "date": "2027-03-08",
+      "balance": -621.19
+    },
+    {
+      "date": "2027-03-09",
+      "balance": -638.29
+    },
+    {
+      "date": "2027-03-10",
+      "balance": -655.39
+    },
+    {
+      "date": "2027-03-11",
+      "balance": -672.48
+    },
+    {
+      "date": "2027-03-12",
+      "balance": -757.57
+    },
+    {
+      "date": "2027-03-13",
+      "balance": -774.66
+    },
+    {
+      "date": "2027-03-14",
+      "balance": -791.75
+    },
+    {
+      "date": "2027-03-15",
+      "balance": -973.84
+    },
+    {
+      "date": "2027-03-16",
+      "balance": -990.93
+    },
+    {
+      "date": "2027-03-17",
+      "balance": -1008.02
+    },
+    {
+      "date": "2027-03-18",
+      "balance": -1025.11
+    },
+    {
+      "date": "2027-03-19",
+      "balance": -1042.20
+    },
+    {
+      "date": "2027-03-20",
+      "balance": -1072.78
+    },
+    {
+      "date": "2027-03-21",
+      "balance": -1089.87
+    },
+    {
+      "date": "2027-03-22",
+      "balance": -1106.96
+    },
+    {
+      "date": "2027-03-23",
+      "balance": -1124.05
+    },
+    {
+      "date": "2027-03-24",
+      "balance": -1141.14
+    },
+    {
+      "date": "2027-03-25",
+      "balance": -1158.23
+    },
+    {
+      "date": "2027-03-26",
+      "balance": -1175.32
+    },
+    {
+      "date": "2027-03-27",
+      "balance": -1192.41
+    },
+    {
+      "date": "2027-03-28",
+      "balance": 1040.50
+    },
+    {
+      "date": "2027-03-29",
+      "balance": 873.41
+    },
+    {
+      "date": "2027-03-30",
+      "balance": 856.32
+    },
+    {
+      "date": "2027-03-31",
+      "balance": 839.23
+    }
+  ]
+}

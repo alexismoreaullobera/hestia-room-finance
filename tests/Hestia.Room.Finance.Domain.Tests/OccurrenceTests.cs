@@ -113,4 +113,16 @@ public class OccurrenceTests
 
     private static RecurringLine Line(Frequency frequency, int day, int? anchorMonth = null, DateOnly? start = null, DateOnly? end = null) =>
         new(Guid.NewGuid(), FlowKind.Expense, "Line", 10m, frequency, day, start ?? LongAgo, anchorMonth, end);
+
+    [Fact]
+    public void OccurrencesIn_SameDay_AreOrderedByName_WhateverTheOrderOfTheLines()
+    {
+        var box = TestPlan.Expense("Box internet", 29.99m, day: 8);
+        var mobile = TestPlan.Expense("Forfait mobile", 12.99m, day: 8);
+        var rent = TestPlan.Expense("Loyer", 650m, day: 5);
+
+        var occurrences = new[] { mobile, box, rent }.OccurrencesIn(TestPlan.April);
+
+        Assert.Equal(["Loyer", "Box internet", "Forfait mobile"], occurrences.Select(o => o.Line.Name));
+    }
 }
