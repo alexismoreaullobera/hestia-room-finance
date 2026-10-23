@@ -428,3 +428,6 @@ FodyWeavers.xsd
 
 # Official VS Code C# Dev Kit Extension exclusion
 #*.lscache
+
+# Views build output (built by dotnet build, never committed)
+src/Hestia.Room.Finance.Views/dist/
