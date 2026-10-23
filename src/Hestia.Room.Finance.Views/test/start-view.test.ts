@@ -69,7 +69,7 @@ describe("startView", () => {
     expect(button("next").disabled).toBe(true);
 
     answer(result("2026-09"));
-    await vi.waitFor(() => expect(byId("month").textContent).toBe("Septembre 2026"));
+    await vi.waitFor(() => { expect(byId("month").textContent).toBe("Septembre 2026"); });
     expect(button("next").disabled).toBe(false);
     expect(byId("status").hidden).toBe(true);
   });
@@ -82,7 +82,7 @@ describe("startView", () => {
 
     button("previous").click();
 
-    await vi.waitFor(() => expect(byId("status").textContent).toBe("Données indisponibles pour ce mois."));
+    await vi.waitFor(() => { expect(byId("status").textContent).toBe("Données indisponibles pour ce mois."); });
     expect(byId("status").classList.contains("error")).toBe(true);
     expect(byId("month").textContent).toBe("Janvier 1");
     expect(render).toHaveBeenCalledTimes(1);
@@ -97,7 +97,7 @@ describe("startView", () => {
 
     button("next").click();
 
-    await vi.waitFor(() => expect(byId("status").textContent).toBe("Impossible de charger ce mois."));
+    await vi.waitFor(() => { expect(byId("status").textContent).toBe("Impossible de charger ce mois."); });
     expect(byId("month").textContent).toBe("Octobre 2026");
     expect(button("next").disabled).toBe(false);
   });
@@ -113,7 +113,7 @@ describe("startView", () => {
     app.sendResult(result("2027-01"));
     answer(result("2026-11"));
 
-    await vi.waitFor(() => expect(byId("month").textContent).toBe("Novembre 2026"));
+    await vi.waitFor(() => { expect(byId("month").textContent).toBe("Novembre 2026"); });
     expect(render).toHaveBeenCalledTimes(3);
   });
 
@@ -131,7 +131,7 @@ describe("startView", () => {
     const app = fakeApp();
     await startView(view, asHostApp(app));
 
-    app.onhostcontextchanged?.({ theme: "light" });
+    app.changeHostContext({ theme: "light" });
 
     expect(document.documentElement.dataset["theme"]).toBe("light");
   });

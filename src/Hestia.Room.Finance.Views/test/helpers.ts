@@ -27,18 +27,20 @@ export interface ToolResultLike {
 
 /** A fake App SDK: the test sends the tool results and decides what the host answers. */
 export function fakeApp() {
-  const app = {
-    ontoolresult: undefined as ((result: ToolResultLike) => void) | undefined,
-    onhostcontextchanged: undefined as ((context: { theme?: string }) => void) | undefined,
+  const listeners = new Map<string, ((params: unknown) => void)[]>();
+  const emit = (event: string, params: unknown) => { for (const listener of listeners.get(event) ?? []) listener(params); };
+  return {
+    addEventListener: (event: string, handler: (params: unknown) => void) => {
+      listeners.set(event, [...(listeners.get(event) ?? []), handler]);
+    },
     connect: vi.fn(async () => {}),
     callServerTool: vi.fn<(params: { name: string; arguments: { month: string } }) => Promise<ToolResultLike>>(),
-    getHostContext: vi.fn(() => ({ theme: "dark" }) as { theme?: string } | undefined),
+    getHostContext: vi.fn<() => { theme?: string } | undefined>(() => ({ theme: "dark" })),
     /** The host sends a tool result, as after a tools/call of the agent. */
-    sendResult(result: ToolResultLike) {
-      app.ontoolresult?.(result);
-    },
+    sendResult: (result: ToolResultLike) => { emit("toolresult", result); },
+    /** The host changes its context, such as its theme. */
+    changeHostContext: (context: { theme?: string }) => { emit("hostcontextchanged", context); },
   };
-  return app;
 }
 
 export function asHostApp(app: ReturnType<typeof fakeApp>): HostApp {
@@ -60,6 +62,9 @@ export class ManualResizeObserver {
 }
 
 /** French formats use narrow and regular no-break spaces: normalized to plain spaces in the assertions. */
+const NARROW_NO_BREAK_SPACE = String.fromCharCode(0x202f);
+const NO_BREAK_SPACE = String.fromCharCode(0xa0);
+
 export function plain(text: string | null | undefined): string {
-  return (text ?? "").replace(/[  ]/g, " ");
+  return (text ?? "").replaceAll(NARROW_NO_BREAK_SPACE, " ").replaceAll(NO_BREAK_SPACE, " ");
 }

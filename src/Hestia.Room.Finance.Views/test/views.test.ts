@@ -10,8 +10,10 @@ import subscriptionsFixture from "./fixtures/subscriptions.json";
 import { plain } from "./helpers";
 
 // The fixtures are the structured content of the view tools on the demo plan, written and checked by a C# test.
-const demoMonth = monthFixture as MonthSummaryOutput;
-const demoForecast = forecastFixture as CashFlowForecastOutput;
+// Typed by annotation, not by assertion: the compiler checks that they match the interfaces. The subscriptions need
+// an assertion, since JSON gives their enums as plain strings, not as the union types.
+const demoMonth: MonthSummaryOutput = monthFixture;
+const demoForecast: CashFlowForecastOutput = forecastFixture;
 const demoSubscriptions = subscriptionsFixture as SubscriptionsOutput;
 
 let content: HTMLElement;

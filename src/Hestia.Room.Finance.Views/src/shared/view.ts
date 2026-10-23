@@ -113,7 +113,7 @@ export function applyHostTheme(context: { theme?: string } | undefined): void {
 }
 
 /** The part of the App SDK a view uses: the tests give a fake one. */
-export type HostApp = Pick<App, "ontoolresult" | "onhostcontextchanged" | "connect" | "callServerTool" | "getHostContext">;
+export type HostApp = Pick<App, "addEventListener" | "connect" | "callServerTool" | "getHostContext">;
 
 export interface ViewDefinition<T> {
   /** French name of the view, given to the host. */
@@ -206,15 +206,15 @@ export async function startView<T extends { month: string }>(
   }
 
   previous.addEventListener("click", () => { if (shown !== null) void goTo(shiftMonth(shown, -1)); });
-  next.addEventListener("click", () => { if (shown !== null) void goTo(shiftMonth(shown, +1)); });
+  next.addEventListener("click", () => { if (shown !== null) void goTo(shiftMonth(shown, 1)); });
   setNavigation(false);
 
   // Handlers must be registered before connecting, so an early result is not missed.
-  app.ontoolresult = (result) => {
+  app.addEventListener("toolresult", (result) => {
     show(result);
     setNavigation(true);
-  };
-  app.onhostcontextchanged = applyHostTheme;
+  });
+  app.addEventListener("hostcontextchanged", applyHostTheme);
 
   try {
     await app.connect();
