@@ -30,6 +30,21 @@ public class MonthlyEquivalentTests
         Assert.Equal(8.33m, Math.Round(equivalent, 2));
     }
 
+    // decimal is not allowed in attributes (InlineData): the cases are written in a TheoryData instead.
+    public static TheoryData<Frequency, decimal, int?, decimal> YearlyCases => new()
+    {
+        { Frequency.Monthly, 13.49m, null, 161.88m },
+        { Frequency.Quarterly, 100m, 1, 400m },
+        { Frequency.Yearly, 180m, 3, 180m },
+    };
+
+    [Theory]
+    [MemberData(nameof(YearlyCases))]
+    public void YearlyAmount_CountsTheDebitsOfAYear(Frequency frequency, decimal amount, int? anchorMonth, decimal expected)
+    {
+        Assert.Equal(expected, Line(frequency, amount, anchorMonth).YearlyAmount);
+    }
+
     private static RecurringLine Line(Frequency frequency, decimal amount, int? anchorMonth = null) =>
         new(Guid.NewGuid(), FlowKind.Expense, "Line", amount, frequency, 10, new DateOnly(2026, 1, 1), anchorMonth);
 }

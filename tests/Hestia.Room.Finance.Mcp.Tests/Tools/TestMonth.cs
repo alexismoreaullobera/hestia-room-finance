@@ -16,6 +16,14 @@ internal static class TestMonth
     public static RecurringLine QuarterlyInApril(string name, decimal amount, int day) =>
         new(Guid.CreateVersion7(), FlowKind.Expense, name, amount, Frequency.Quarterly, day, LongAgo, anchorMonth: 4);
 
+    public static RecurringLine Quarterly(string name, decimal amount, int day, int anchorMonth, SubscriptionInfo? subscription = null) =>
+        new(Guid.CreateVersion7(), FlowKind.Expense, name, amount, Frequency.Quarterly, day, LongAgo, anchorMonth,
+            subscription: subscription);
+
+    public static RecurringLine Subscription(string name, decimal amount, int day, DateOnly? commitmentEnd = null) =>
+        new(Guid.CreateVersion7(), FlowKind.Expense, name, amount, Frequency.Monthly, day, LongAgo,
+            category: Category.Leisure, subscription: new SubscriptionInfo(commitmentEnd));
+
     public static FinanceMonth April2026(
         decimal startingBalance,
         IEnumerable<RecurringLine> lines,

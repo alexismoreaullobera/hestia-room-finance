@@ -18,4 +18,14 @@ internal static class FrenchText
         YearMonth.TryParse(month, out var parsed) ? parsed.FirstDay.ToString("MMMM yyyy", French) : month;
 
     public static string Day(DateOnly date) => date.ToString("dd/MM", French);
+
+    public static string FullDate(DateOnly date) => date.ToString("dd/MM/yyyy", French);
+
+    public static string FrequencyName(Frequency frequency) => frequency switch
+    {
+        Frequency.Monthly => "mensuel",
+        Frequency.Quarterly => "trimestriel",
+        Frequency.Yearly => "annuel",
+        _ => frequency.ToString(),
+    };
 }

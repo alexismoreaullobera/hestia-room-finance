@@ -47,6 +47,36 @@ public sealed class FinanceDataTools
         return Result(output, output.Describe());
     }
 
+    [McpServerTool(Name = "list_recurring_lines", Title = "Lignes récurrentes", ReadOnly = true, Idempotent = true,
+        OpenWorld = false, UseStructuredContent = true, OutputSchemaType = typeof(RecurringLinesOutput))]
+    [Description("Recurring incomes and expenses running during a month (salary, rent, energy, insurance, subscriptions), "
+        + "with their date in the month and their monthly equivalent.")]
+    public static async Task<CallToolResult> ListRecurringLines(
+        FinancePlanReader reader,
+        FinanceClock clock,
+        [Description(MonthArgument.Description)] string? month = null,
+        CancellationToken cancellationToken = default)
+    {
+        var financeMonth = await reader.LoadMonthAsync(MonthArgument.Resolve(month, clock), cancellationToken);
+        var output = RecurringLinesOutput.From(financeMonth);
+        return Result(output, output.Describe());
+    }
+
+    [McpServerTool(Name = "list_subscriptions", Title = "Abonnements", ReadOnly = true, Idempotent = true,
+        OpenWorld = false, UseStructuredContent = true, OutputSchemaType = typeof(SubscriptionsOutput))]
+    [Description("Subscriptions running during a month, with their monthly and yearly cost, their debit date in the month "
+        + "and the end of their commitment, plus the monthly and yearly totals.")]
+    public static async Task<CallToolResult> ListSubscriptions(
+        FinancePlanReader reader,
+        FinanceClock clock,
+        [Description(MonthArgument.Description)] string? month = null,
+        CancellationToken cancellationToken = default)
+    {
+        var financeMonth = await reader.LoadMonthAsync(MonthArgument.Resolve(month, clock), cancellationToken);
+        var output = SubscriptionsOutput.From(financeMonth);
+        return Result(output, output.Describe());
+    }
+
     private static CallToolResult Result<T>(T output, string summary) => new()
     {
         // Text for the model and for hosts without UI; structured content matching the advertised output schema,
