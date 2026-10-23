@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Synthèse du mois</title>
+  <style>
+    /* @shared view.css */
+
+    .cards { --card-min: 200px; }
+    .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+    tr.total td { font-weight: 600; }
+  </style>
+</head>
+<body>
+  <header class="view-header">
+    <button id="previous" type="button" aria-label="Mois précédent">‹</button>
+    <h1><span class="label">Synthèse du mois</span><span id="month">…</span></h1>
+    <button id="next" type="button" aria-label="Mois suivant">›</button>
+  </header>
+  <p class="status" id="status">En attente des données…</p>
+  <main id="content" hidden></main>
+
+  <script type="module">
+    /* @shared view.js */
+
+    /** The savings capacity of one reading, as falling due this month and on an average month. */
+    function savings(title, figures) {
+      return card(title, amount(figures.savingsCapacity),
+        element("span", {}, "Sur un mois moyen : ", amount(figures.smoothedSavingsCapacity)));
+    }
+
+    function row(label, planned, actual, className = "") {
+      return element("tr", { className },
+        element("td", { text: label }), amount(planned, "td"), amount(actual, "td"));
+    }
+
+    await startView({
+      name: "Synthèse du mois",
+      tool: "show_month_overview",
+      render: ({ planned, actual }, content) => {
+        content.append(
+          element("div", { className: "cards" },
+            savings("Capacité d'épargne prévue", planned),
+            savings("Capacité d'épargne réelle", actual)),
+          element("table", {},
+            element("thead", {}, element("tr", {},
+              element("th", { text: "Ce mois-ci" }),
+              element("th", { className: "amount", text: "Prévu" }),
+              element("th", { className: "amount", text: "Réel" }))),
+            element("tbody", {},
+              row("Entrées", planned.incomes, actual.incomes),
+              row("Dépenses récurrentes", planned.recurringExpenses, actual.recurringExpenses),
+              row("Budgets", planned.budgets, actual.budgets),
+              row("Capacité d'épargne", planned.savingsCapacity, actual.savingsCapacity, "total"))),
+          element("p", {
+            className: "note",
+            text: "Réel : les montants saisis pour ce mois (réels des budgets, corrections des lignes), le prévu ailleurs. "
+              + "Mois moyen : les lignes trimestrielles et annuelles lissées sur l'année.",
+          }));
+      },
+    });
+  </script>
+</body>
+</html>

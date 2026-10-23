@@ -27,6 +27,7 @@ public class CashFlowForecastOutputTests
         Assert.Equal(new DailyBalanceOutput(new DateOnly(2026, 4, 5), -550m), output.LowPoint);
         Assert.Equal(650m, output.CashBuffer);
         Assert.True(output.HasAlert);
+        Assert.False(output.StartsOverdrawn);
         Assert.Equal([new DebitOutput("Loyer", new DateOnly(2026, 4, 5), 650m)], output.ContributingDebits);
     }
 
@@ -71,6 +72,7 @@ public class CashFlowForecastOutputTests
         var text = output.Describe();
 
         Assert.True(output.HasAlert);
+        Assert.True(output.StartsOverdrawn);
         Assert.Equal(0m, output.CashBuffer);
         Assert.Contains("Le compte démarre déjà à découvert", text);
         Assert.DoesNotContain("au moins", text);

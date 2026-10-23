@@ -13,6 +13,9 @@ public sealed record CashFlowForecastOutput(
     [property: Description("Minimum to have on the account at the start of the month so the balance never goes below zero.")]
     decimal CashBuffer,
     [property: Description("True when the balance, from the starting balance, goes below zero during the month.")] bool HasAlert,
+    [property: Description("True when the alert comes from the starting balance itself, already below zero: the movements of "
+        + "the month do not dig it deeper (no buffer needed for the month).")]
+    bool StartsOverdrawn,
     [property: Description("Recurring expenses that dig the low point: the ones to move to avoid it. Empty when the month needs no buffer.")]
     IReadOnlyList<DebitOutput> ContributingDebits,
     [property: Description("End-of-day forecast balance, for every day of the month.")] IReadOnlyList<DailyBalanceOutput> Days)
@@ -23,6 +26,8 @@ public sealed record CashFlowForecastOutput(
         DailyBalanceOutput.From(forecast.LowPoint),
         Cents(forecast.CashBuffer),
         forecast.HasAlert,
+        // No buffer needed although the balance is below zero: the month starts overdrawn, nothing digs deeper.
+        forecast.HasAlert && forecast.CashBuffer == 0m,
         [.. forecast.ContributingDebits.Select(DebitOutput.From)],
         [.. forecast.Days.Select(DailyBalanceOutput.From)]);
 
@@ -38,10 +43,9 @@ public sealed record CashFlowForecastOutput(
                 + $"(coussin de trésorerie nécessaire : {Euros(CashBuffer)}).";
         }
 
-        // No buffer needed although the balance is below zero: the month starts overdrawn, nothing digs deeper.
-        var cause = CashBuffer > 0m
-            ? $"Il faudrait démarrer le mois avec au moins {Euros(CashBuffer)} pour l'éviter."
-            : "Le compte démarre déjà à découvert : les mouvements du mois ne le creusent pas davantage.";
+        var cause = StartsOverdrawn
+            ? "Le compte démarre déjà à découvert : les mouvements du mois ne le creusent pas davantage."
+            : $"Il faudrait démarrer le mois avec au moins {Euros(CashBuffer)} pour l'éviter.";
         var debits = ContributingDebits.Count > 0
             ? " Débits qui creusent ce point bas : "
                 + string.Join(", ", ContributingDebits.Select(d => $"{d.Name} ({Euros(d.Amount)}, le {Day(d.Date)})")) + "."

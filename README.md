@@ -7,9 +7,9 @@
 
 The **personal finance room** of Hestia: plan the incomes and expenses of each month, forecast the low point of the account, compare plan and actuals, and track subscriptions, with no bank connection. Hestia is a personal AI assistant built from standalone "rooms", one per area of life. Each room is a self-contained application that also exposes an **MCP server** (Model Context Protocol): tools an AI agent can call, and **widgets** (MCP Apps) a host can display.
 
-![show_balance widget rendered in the MCP Inspector](docs/images/t1-inspector-apps.png)
+![Cash flow forecast view rendered in the MCP Inspector: alert, low point, cash buffer, daily curve and the debits that dig the low point](docs/images/t7-cash-flow-forecast.png)
 
-> **Status: in progress.** The business core, its persistence (SQL Server, EF Core) and the four read-only **data tools** of the MCP server are done and tested, on a fictitious demo plan. The widgets come next: until then, the server still exposes the first spike widget, on **fake data**. The v1 features are defined in the [scope](docs/scope.md).
+> **Status: in progress.** The business core, its persistence (SQL Server, EF Core), the four read-only **data tools** and the three **views** (MCP Apps widgets) are done and tested, on a fictitious demo plan. Input (forms) comes next. The v1 features are defined in the [scope](docs/scope.md).
 
 ## Features
 
@@ -30,12 +30,26 @@ The **personal finance room** of Hestia: plan the incomes and expenses of each m
 | `list_recurring_lines` | Recurring lines of the month, with their date in the month and monthly equivalent |
 | `list_subscriptions` | Subscriptions with their monthly and yearly cost, commitment end, and the totals |
 
-Each tool takes an optional `month` (`YYYY-MM`, the current month in Paris time by default) and returns a **text summary** in French (for the model and hosts without UI) plus **structured content** with an advertised output schema. The **`show_balance`** spike tool and its **`ui://finance/balance.html`** widget (MCP Apps) stay until the real widgets replace them.
+Each tool takes an optional `month` (`YYYY-MM`, the current month in Paris time by default) and returns a **text summary** in French (for the model and hosts without UI) plus **structured content** with an advertised output schema.
+
+**Views** (MCP Apps): each view tool is its data tool plus a `ui://` widget that MCP Apps hosts render with the result; a host without UI shows the text summary.
+
+| View tool | Widget | What it shows |
+|---|---|---|
+| `show_month_overview` | `ui://finance/month-overview.html` | Savings capacity planned and actual (cash and on an average month), incomes, recurring expenses, budgets |
+| `show_cash_flow_forecast` | `ui://finance/cash-flow-forecast.html` | Alert, starting balance, low point, cash buffer, daily curve (hand-made SVG), contributing debits |
+| `show_subscriptions` | `ui://finance/subscriptions.html` | Monthly and yearly totals, each subscription with its debit of the month and its commitment end |
+
+The views follow the host theme (light or dark), change month with their own tool (previous and next buttons, through `callServerTool`, without going through the agent), and never write HTML from data (text only).
+
+| Month overview | Subscriptions |
+|---|---|
+| ![Month overview view: planned and actual savings capacity, then incomes, expenses and budgets](docs/images/t7-month-overview.png) | ![Subscriptions view: totals, then each subscription with its debit date and commitment end](docs/images/t7-subscriptions.png) |
 
 ## Architecture
 
 ```
-Hestia.Room.Finance.Mcp             MCP server: tools and widgets (ASP.NET Core)
+Hestia.Room.Finance.Mcp             MCP server: tools and views (ASP.NET Core, MCP Apps)
         │ uses
 Hestia.Room.Finance.Infrastructure  SQL Server through EF Core: persistence rows, conversions
         │ depends on
@@ -78,7 +92,7 @@ Hestia.Room.Finance.Domain          business rules and calculations, pure C#: no
    ```bash
    npx @modelcontextprotocol/inspector
    ```
-6. In the Inspector, connect with transport **Streamable HTTP** and URL `http://localhost:5135/mcp`. In the **Tools** tab, call `get_cash_flow_forecast` without argument: the demo shows the alert of the current month. The **Apps** tab still shows the `show_balance` spike widget.
+6. In the Inspector, connect with transport **Streamable HTTP** and URL `http://localhost:5135/mcp`. In the **Apps** tab, open `show_cash_flow_forecast`: the demo shows the alert of the current month; the arrows change month. The **Tools** tab calls the data tools, such as `get_month_summary`.
 
 `docker compose down` stops the database and keeps the data; `docker compose down -v` deletes it.
 
@@ -105,7 +119,7 @@ dotnet test
 
 - **Domain**: every calculation rule of the [scope](docs/scope.md), with business-named tests; sensitive rules checked by mutation.
 - **Infrastructure**: domain ↔ row conversions and the schema checked offline from the EF Core model; then, on a real SQL Server (Testcontainers, one fresh migrated database per test): migrations, round trip of every entity, constraints, cascades, the month reader and the demo seeder.
-- **MCP server**: unit tests of the tool outputs and text summaries on plans built in memory, of the month argument and of the clock (month change in Paris time); then end-to-end tests on the `/mcp` endpoint with an in-memory server, a real SQL Server and a fixed clock: the four data tools (annotations, output schema, figures equal to the domain applied to the demo plan, tool errors), the spike widget metadata (MIME type, CSP) and host filtering.
+- **MCP server**: unit tests of the tool outputs and text summaries on plans built in memory, of the month argument and of the clock (month change in Paris time); then end-to-end tests on the `/mcp` endpoint with an in-memory server, a real SQL Server and a fixed clock: the four data tools (annotations, output schema, figures equal to the domain applied to the demo plan, tool errors), the three view tools (their `ui://` link, a result equal to their data tool) and views (MIME type, CSP, shared code injected, no HTML written from data, no domain outside the CSP, month navigation through their own tool), and host filtering. The widgets themselves were checked by hand in the MCP Inspector (light and dark, month navigation, narrow and wide); automated JavaScript tests come with the bundling of the widget SDK.
 
 Tests use xUnit v3 on the Microsoft Testing Platform (declared in `global.json`).
 
@@ -131,7 +145,7 @@ Every change goes through a pull request: `main` is protected, and the CI (build
 ├─ src/
 │  ├─ Hestia.Room.Finance.Domain/          business rules and calculations
 │  ├─ Hestia.Room.Finance.Infrastructure/  EF Core: DbContext, Configurations/, Rows/
-│  └─ Hestia.Room.Finance.Mcp/             MCP server: Tools/ (and Outputs/), Time/, Views/ (widgets), Data/ (spike fake data)
+│  └─ Hestia.Room.Finance.Mcp/             MCP server: Tools/ (and Outputs/), Time/, Views/ (widgets, and shared/ code)
 ├─ tests/                                  one test project per project above, plus Hestia.Room.Finance.Testing (shared SQL Server fixture)
 ├─ docs/                                   scope and technical notes
 ├─ docker-compose.yml                      local SQL Server (password in .env, see .env.example)
@@ -144,7 +158,7 @@ Every change goes through a pull request: `main` is protected, and the CI (build
 ## Documentation
 
 - [Finance room v1 scope](docs/scope.md): purpose, glossary, data model, calculation rules, views and tools.
-- [Spike T1: MCP Apps in C#](docs/spike-mcp-apps.md): how the widget pipeline works, findings and pitfalls.
+- [Spike T1: MCP Apps in C#](docs/spike-mcp-apps.md): how the widget pipeline works, findings and pitfalls (the spike widget was replaced by the v1 views in T7).
 
 ## Security
 
