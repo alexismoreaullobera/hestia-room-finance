@@ -1,14 +1,21 @@
+using Hestia.Room.Finance.Infrastructure;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.MsSql;
+using Xunit;
 
-namespace Hestia.Room.Finance.Infrastructure.Tests.Database;
+namespace Hestia.Room.Finance.Testing;
 
 /// <summary>
-/// One throwaway SQL Server container (Testcontainers) shared by every database test of the run: starting SQL Server
-/// takes seconds, so it is done once. Each test then gets its own fresh database, migrated from scratch: tests never
-/// see each other's data. Requires Docker (Docker Desktop locally, already there on the CI runners).
+/// One throwaway SQL Server container (Testcontainers) shared by every database test of a test project: starting
+/// SQL Server takes seconds, so it is done once. Each test then gets its own fresh database, migrated from scratch:
+/// tests never see each other's data. The test databases are never dropped: they disappear with the container at the
+/// end of the run. Requires Docker (Docker Desktop locally, already there on the CI runners).
 /// </summary>
+/// <remarks>
+/// xUnit only finds a collection definition in the test project itself: each test project declares its own
+/// <c>[CollectionDefinition]</c> with <c>ICollectionFixture&lt;SqlServerFixture&gt;</c>.
+/// </remarks>
 public sealed class SqlServerFixture : IAsyncLifetime
 {
     // Same pinned image as docker-compose.yml: the tests run against the version used locally.
@@ -38,11 +45,4 @@ public sealed class SqlServerFixture : IAsyncLifetime
         await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
         return options;
     }
-}
-
-/// <summary>Every class of this collection shares the same SQL Server container.</summary>
-[CollectionDefinition(Name)]
-public sealed class SqlServerCollection : ICollectionFixture<SqlServerFixture>
-{
-    public const string Name = "SQL Server";
 }

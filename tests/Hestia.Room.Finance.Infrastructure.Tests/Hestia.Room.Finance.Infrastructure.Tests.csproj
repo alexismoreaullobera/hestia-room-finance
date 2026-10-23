@@ -12,16 +12,18 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Testcontainers.MsSql" Version="4.16.0" />
     <PackageReference Include="xunit.v3.mtp-v2" Version="4.0.2" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <!-- SqlServerFixture, shared with the MCP tests. -->
+    <Using Include="Hestia.Room.Finance.Testing" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Hestia.Room.Finance.Infrastructure\Hestia.Room.Finance.Infrastructure.csproj" />
+    <ProjectReference Include="..\Hestia.Room.Finance.Testing\Hestia.Room.Finance.Testing.csproj" />
   </ItemGroup>
 
 </Project>
