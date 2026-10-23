@@ -8,7 +8,8 @@
   <style>
     /* @shared view.css */
 
-    .highlights { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    /* As many columns as fit: the cards wrap in a narrow view instead of overflowing. */
+    .highlights { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 12px; }
     .highlights .card { margin: 0; }
     .highlights .title { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
     .highlights .big { font-size: 24px; font-weight: 600; margin: 2px 0; }

@@ -7,6 +7,24 @@
   <title>Prévisionnel de trésorerie</title>
   <style>
     /* @shared view.css */
+
+    /* As many columns as fit: the cards wrap in a narrow view instead of overflowing. */
+    .figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }
+    .figures .card { margin: 0; }
+    .figures .title { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    .figures .big { font-size: 20px; font-weight: 600; margin-top: 2px; }
+    .figures .detail { color: var(--muted); font-size: 12px; }
+    .calm { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+    .chart { width: 100%; height: auto; display: block; margin-bottom: 12px; }
+    .chart .axis { fill: var(--muted); font-size: 11px; }
+    .chart .grid { stroke: var(--line); stroke-width: 1; }
+    .chart .zero { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 3; }
+    .chart .curve { fill: none; stroke: var(--accent); stroke-width: 2; }
+    .chart .below { fill: var(--negative); opacity: .15; }
+    .chart .low { fill: var(--negative); }
+    .chart .day { fill: transparent; }
+    .chart .day:hover { fill: var(--line); opacity: .4; }
+    h2 { font-size: 14px; margin: 16px 0 4px; }
   </style>
 </head>
 <body>
@@ -21,11 +39,134 @@
   <script type="module">
     /* @shared view.js */
 
+    const SVG = "http://www.w3.org/2000/svg";
+    // Drawing area, in viewBox units: the chart scales to the width of the view.
+    const WIDTH = 640, HEIGHT = 220, LEFT = 72, RIGHT = 12, TOP = 12, BOTTOM = 24;
+
+    /** An SVG element; text through textContent only, as for HTML elements. */
+    function svg(tag, attributes = {}, ...children) {
+      const node = document.createElementNS(SVG, tag);
+      for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));
+      node.append(...children);
+      return node;
+    }
+
+    function svgText(text, attributes) {
+      const node = svg("text", attributes);
+      node.textContent = text;
+      return node;
+    }
+
+    function figure(title, value, detail) {
+      return element("div", { className: "card" },
+        element("div", { className: "title", text: title }),
+        element("div", { className: "big" }, amount(value)),
+        element("div", { className: "detail", text: detail ?? "" }));
+    }
+
+    /** The end-of-day balance of every day, the zero line, the part below zero and the low point. */
+    function chart(days, lowPoint) {
+      const balances = days.map(d => d.balance);
+      const min = Math.min(0, ...balances);
+      const max = Math.max(0, ...balances);
+      const margin = (max - min) * 0.08 || 1;
+      const low = min - margin, high = max + margin;
+      const x = index => LEFT + (index * (WIDTH - LEFT - RIGHT)) / Math.max(1, days.length - 1);
+      const y = balance => TOP + ((high - balance) * (HEIGHT - TOP - BOTTOM)) / (high - low);
+      const zeroY = y(0);
+      const points = days.map((d, i) => `${x(i).toFixed(1)},${y(d.balance).toFixed(1)}`);
+
+      const lowIndex = days.findIndex(d => d.date === lowPoint.date);
+      const label = `Courbe du solde, de ${formatEuros(days[0].balance)} le ${formatDay(days[0].date)} `
+        + `à ${formatEuros(days.at(-1).balance)} le ${formatDay(days.at(-1).date)}, `
+        + `point bas ${formatEuros(lowPoint.balance)} le ${formatDay(lowPoint.date)}.`;
+
+      const chartNode = svg("svg", { class: "chart", viewBox: `0 0 ${WIDTH} ${HEIGHT}`, role: "img", "aria-label": label },
+        svg("defs", {}, svg("clipPath", { id: "below-zero" },
+          svg("rect", { x: LEFT, y: zeroY, width: WIDTH - LEFT - RIGHT, height: Math.max(0, HEIGHT - BOTTOM - zeroY) }))),
+        // Highest and lowest balances, unless they are the zero line itself (labelled below).
+        ...[max, min].filter(value => value !== 0).flatMap(value => [
+          svg("line", { class: "grid", x1: LEFT, x2: WIDTH - RIGHT, y1: y(value), y2: y(value) }),
+          svgText(formatEuros(value), { class: "axis", x: LEFT - 6, y: y(value) + 4, "text-anchor": "end" }),
+        ]),
+        // The area between the curve and zero, kept only below zero by the clip.
+        svg("polygon", {
+          class: "below", "clip-path": "url(#below-zero)",
+          points: `${x(0).toFixed(1)},${zeroY.toFixed(1)} ${points.join(" ")} ${x(days.length - 1).toFixed(1)},${zeroY.toFixed(1)}`,
+        }),
+        svg("line", { class: "zero", x1: LEFT, x2: WIDTH - RIGHT, y1: zeroY, y2: zeroY }),
+        svgText("0 €", { class: "axis", x: LEFT - 6, y: zeroY + 4, "text-anchor": "end" }),
+        svg("polyline", { class: "curve", points: points.join(" ") }));
+
+      // One label every week on the time axis, and the last day (a weekly label too close to it is skipped).
+      const last = days.length - 1;
+      days.forEach((d, i) => {
+        if ((i % 7 === 0 && last - i > 3) || i === last) {
+          chartNode.append(svgText(formatDay(d.date), { class: "axis", x: x(i), y: HEIGHT - 6, "text-anchor": "middle" }));
+        }
+      });
+
+      // A transparent column per day: hovering it shows the balance of that day (native SVG tooltip).
+      const column = (WIDTH - LEFT - RIGHT) / Math.max(1, days.length - 1);
+      days.forEach((d, i) => {
+        const hover = svg("rect", { class: "day", x: x(i) - column / 2, y: TOP, width: column, height: HEIGHT - TOP - BOTTOM });
+        const title = svg("title");
+        title.textContent = `${formatDay(d.date)} : ${formatEuros(d.balance)}`;
+        hover.append(title);
+        chartNode.append(hover);
+      });
+
+      if (lowIndex >= 0) {
+        chartNode.append(svg("circle", { class: "low", cx: x(lowIndex), cy: y(lowPoint.balance), r: 4 }));
+      }
+      return chartNode;
+    }
+
+    function summary(data) {
+      if (!data.hasAlert) {
+        return element("div", { className: "calm" },
+          element("strong", { className: "positive", text: "Pas d'alerte : " }),
+          document.createTextNode("le solde ne passe pas sous zéro ce mois-ci."));
+      }
+      const advice = data.cashBuffer > 0
+        ? `Il faudrait démarrer le mois avec au moins ${formatEuros(data.cashBuffer)} pour l'éviter.`
+        : "Le compte démarre déjà à découvert : les mouvements du mois ne le creusent pas davantage.";
+      return element("div", { className: "alert" },
+        element("strong", { className: "negative", text: "Alerte : " }),
+        document.createTextNode(`le compte passe sous zéro (point bas ${formatEuros(data.lowPoint.balance)} `
+          + `le ${formatDay(data.lowPoint.date)}). ${advice}`));
+    }
+
+    function debits(contributingDebits) {
+      if (contributingDebits.length === 0) {
+        return [];
+      }
+      return [
+        element("h2", { text: "Débits qui creusent le point bas" }),
+        element("table", {},
+          element("thead", {}, element("tr", {},
+            element("th", { text: "Date" }),
+            element("th", { text: "Ligne" }),
+            element("th", { className: "amount", text: "Montant" }))),
+          element("tbody", {}, ...contributingDebits.map(debit => element("tr", {},
+            element("td", { text: formatDay(debit.date) }),
+            element("td", { text: debit.name }),
+            amount(debit.amount, "td"))))),
+      ];
+    }
+
     await startView({
       name: "Cash flow forecast",
       tool: "show_cash_flow_forecast",
       render: (data, content) => {
-        content.append(element("p", { className: "muted", text: "Vue en construction." }));
+        content.append(
+          summary(data),
+          element("div", { className: "figures" },
+            figure("Solde de départ", data.startingBalance, "au début du mois"),
+            figure("Point bas", data.lowPoint.balance, `le ${formatDay(data.lowPoint.date)}`),
+            figure("Coussin nécessaire", data.cashBuffer, "pour ne jamais passer sous zéro")),
+          chart(data.days, data.lowPoint),
+          ...debits(data.contributingDebits));
       },
     });
   </script>
