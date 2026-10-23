@@ -44,13 +44,6 @@ public partial class McpEndpointTests(McpServerFixture mcp)
         from month in new[] { DevelopmentMcpServerFactory.CurrentMonth.AddMonths(-1).ToString(), null, "2026-13", "0000-12" }
         select (view.ViewTool, view.DataTool, month));
 
-    // Every API able to turn a string into markup or code: none may appear in a view.
-    private static readonly string[] HtmlAndCodeSinks =
-    [
-        "innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "setHTMLUnsafe", "createContextualFragment",
-        "DOMParser", "parseFromString", "srcdoc", "eval(", "new Function", "import(", "javascript:",
-    ];
-
     private readonly McpTestClient _mcp = new(mcp.Server.CreateClient());
 
     [Fact]
@@ -135,7 +128,8 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
         var view = result["resources"]!.AsArray().Single(r => (string?)r!["uri"] == viewUri)!;
         Assert.Equal("text/html;profile=mcp-app", (string?)view["mimeType"]);
-        Assert.Contains("https://unpkg.com", ResourceDomains(view));
+        Assert.NotNull(view["_meta"]?["ui"]?["csp"]);
+        Assert.Empty(CspDomains(view));
         Assert.All(new[] { "name", "title", "description" }, key => Assert.False(string.IsNullOrWhiteSpace((string?)view[key])));
     }
 
@@ -148,70 +142,31 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
         Assert.Equal("text/html;profile=mcp-app", (string?)contents["mimeType"]);
         Assert.StartsWith("<!doctype html>", (string)contents["text"]!, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("https://unpkg.com", ResourceDomains(contents));
+        Assert.NotNull(contents["_meta"]?["ui"]?["csp"]);
+        Assert.Empty(CspDomains(contents));
     }
 
     [Theory]
     [MemberData(nameof(ViewUris))]
-    public async Task ResourcesRead_AView_HasTheSharedCodeInPlace(string viewUri)
+    public async Task AView_IsSelfContained_LoadingNothingFromOutside(string viewUri)
     {
+        // The build inlines the scripts, the styles and the App SDK: no CDN, no third-party code loaded at runtime.
+        // The markup rules (no innerHTML, attributes through the allowlist) are checked by ESLint and the JS tests.
         var html = (string)(await ReadViewAsync(viewUri))["text"]!;
 
-        // The shared styles in the style block; the shared script first in the module (its import must stay first).
-        Assert.Contains(Embedded("views/shared/view.css"), StyleBlock().Match(html).Groups[1].Value);
-        Assert.StartsWith(Embedded("views/shared/view.js"), ModuleBlock().Match(html).Groups[1].Value.TrimStart());
-        Assert.DoesNotContain("@shared", html);
-    }
-
-    [Theory]
-    [MemberData(nameof(ViewUris))]
-    public async Task AView_NeverTurnsDataIntoMarkupOrCode(string viewUri)
-    {
-        // Tool data is untrusted (a name typed by the user, prompt injection): views set text only.
-        var html = (string)(await ReadViewAsync(viewUri))["text"]!;
-
-        Assert.All(HtmlAndCodeSinks, sink => Assert.DoesNotContain(sink, html));
-        // Every attribute goes through the allowlist of the shared kit: a single setAttribute call, in setAttributes().
-        Assert.Single(SetAttributeCall().Matches(html));
-        Assert.Contains("SAFE_ATTRIBUTES.has(name)", html);
-    }
-
-    [Theory]
-    [MemberData(nameof(ViewUris))]
-    public async Task AView_UsesExactlyTheDomainsOfItsCsp(string viewUri)
-    {
-        var contents = await ReadViewAsync(viewUri);
-
-        // Any scheme and protocol-relative URLs, with their port; the SVG namespace is a name, not a load.
-        var used = ExternalUrl().Matches((string)contents["text"]!)
-            .Select(m => m.Groups["origin"].Value)
-            .Select(origin => origin.StartsWith("//", StringComparison.Ordinal) ? "https:" + origin : origin)
-            .Where(origin => origin != "http://www.w3.org")
-            .ToHashSet();
-
-        // Equal, not only included: the CSP stays minimal, and this test cannot go empty without failing.
-        Assert.Equal(ResourceDomains(contents).Order(), used.Order());
-    }
-
-    [Theory]
-    [MemberData(nameof(ViewToolsAndViews))]
-    public async Task AView_ChangesMonthThroughItsOwnTool_Only(string viewTool, string viewUri)
-    {
-        var html = (string)(await ReadViewAsync(viewUri))["text"]!;
-
-        // The previous and next buttons call view.tool, which must be the tool that links to this view.
-        Assert.Equal(viewTool, Assert.Single(ViewToolDeclaration().Matches(html)).Groups["tool"].Value);
-        Assert.Single(CallServerTool().Matches(html));
-        Assert.Single(CallServerToolWithViewTool().Matches(html));
+        Assert.Single(ModuleScript().Matches(html));
+        Assert.DoesNotMatch(ExternalLoad(), html);
+        Assert.DoesNotContain("<link", html, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public async Task SubscriptionsView_TranslatesEveryFrequencyAndCategory()
+    public void ViewsOutputs_DeclareEveryFrequencyAndCategory()
     {
-        // A new value of the domain enums must not show up in English in the view.
-        var html = (string)(await ReadViewAsync("ui://finance/subscriptions.html"))["text"]!;
+        // The TypeScript unions of outputs.ts follow the domain enums; the views translate every value of the
+        // unions (a Record over them), so a new value of the domain cannot show up untranslated.
+        var outputs = File.ReadAllText(Path.Combine(ViewFixturesTests.ViewsProjectDirectory(), "src", "shared", "outputs.ts"));
 
-        Assert.All(Enum.GetNames<Frequency>().Concat(Enum.GetNames<Category>()), name => Assert.Contains($"{name}: \"", html));
+        Assert.All(Enum.GetNames<Frequency>().Concat(Enum.GetNames<Category>()), name => Assert.Contains($"\"{name}\"", outputs));
     }
 
     [Fact]
@@ -226,26 +181,12 @@ public partial class McpEndpointTests(McpServerFixture mcp)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    [GeneratedRegex("<style>(.*?)</style>", RegexOptions.Singleline)]
-    private static partial Regex StyleBlock();
+    [GeneratedRegex(@"<script type=""module""")]
+    private static partial Regex ModuleScript();
 
-    [GeneratedRegex("<script type=\"module\">(.*?)</script>", RegexOptions.Singleline)]
-    private static partial Regex ModuleBlock();
-
-    [GeneratedRegex(@"\bsetAttribute\(")]
-    private static partial Regex SetAttributeCall();
-
-    [GeneratedRegex(@"(?<origin>(?:\b(?:https?|wss?):)?//[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?::\d+)?)", RegexOptions.IgnoreCase)]
-    private static partial Regex ExternalUrl();
-
-    [GeneratedRegex(@"\btool:\s*[""'](?<tool>\w+)[""']")]
-    private static partial Regex ViewToolDeclaration();
-
-    [GeneratedRegex(@"\bcallServerTool\(")]
-    private static partial Regex CallServerTool();
-
-    [GeneratedRegex(@"\bcallServerTool\(\{\s*name:\s*view\.tool\b")]
-    private static partial Regex CallServerToolWithViewTool();
+    // A src or href attribute pointing to another origin (any scheme, or protocol relative).
+    [GeneratedRegex(@"\b(?:src|href)\s*=\s*[""']?(?:[a-z][a-z0-9+.-]*:)?//", RegexOptions.IgnoreCase)]
+    private static partial Regex ExternalLoad();
 
     private async Task<JsonNode> ToolAsync(string name) =>
         (await _mcp.SendAsync("tools/list"))["tools"]!.AsArray().Single(t => (string?)t!["name"] == name)!;
@@ -255,8 +196,9 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
     private static string Text(JsonNode result) => (string)result["content"]!.AsArray().Single()!["text"]!;
 
-    private static IEnumerable<string?> ResourceDomains(JsonNode resource) =>
-        resource["_meta"]?["ui"]?["csp"]?["resourceDomains"]?.AsArray().Select(d => (string?)d) ?? [];
+    /// <summary>Every domain the CSP of a view allows, whatever the directive: none, the views being self-contained.</summary>
+    private static IEnumerable<string?> CspDomains(JsonNode resource) =>
+        resource["_meta"]?["ui"]?["csp"]?.AsObject().SelectMany(directive => directive.Value?.AsArray() ?? []).Select(d => (string?)d) ?? [];
 
     /// <summary>The annotations of a tool without its title: the hints a view tool shares with its data tool.</summary>
     private static JsonObject HintsOf(JsonNode tool)
@@ -264,12 +206,5 @@ public partial class McpEndpointTests(McpServerFixture mcp)
         var hints = tool["annotations"]!.DeepClone().AsObject();
         hints.Remove("title");
         return hints;
-    }
-
-    private static string Embedded(string name)
-    {
-        using var stream = typeof(FinanceViewResources).Assembly.GetManifestResourceStream(name)!;
-        using var reader = new StreamReader(stream);
-        return reader.ReadToEnd();
     }
 }

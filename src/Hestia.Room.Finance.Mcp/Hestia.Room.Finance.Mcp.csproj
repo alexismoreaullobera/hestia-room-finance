@@ -27,12 +27,49 @@
     <ProjectReference Include="..\Hestia.Room.Finance.Infrastructure\Hestia.Room.Finance.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!--
+    MCP Apps views (ui:// resources): built by the views project (src/Hestia.Room.Finance.Views, TypeScript, Vite),
+    one self-contained HTML each, then embedded in this assembly. dotnet build runs npm ci when the lock file changed,
+    and the Vite build when a source changed (Inputs/Outputs): Node.js is a prerequisite, as Docker for the tests.
+  -->
+  <PropertyGroup>
+    <ViewsProjectDir>$([MSBuild]::EnsureTrailingSlash($([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../Hestia.Room.Finance.Views'))))</ViewsProjectDir>
+    <ViewsDistDir>$(ViewsProjectDir)dist\</ViewsDistDir>
+  </PropertyGroup>
+
   <ItemGroup>
-    <!-- MCP Apps views (ui:// resources) and the code they share are embedded in the assembly and served by the MCP server. -->
-    <!-- Explicit resource names (views/..., views/shared/...): the default name depends on the root namespace and
-    rewrites folder names. WithCulture=false: a file such as view.fr.js stays in this assembly. -->
-    <EmbeddedResource Include="Views\*.html" LogicalName="views/%(Filename)%(Extension)" WithCulture="false" />
-    <EmbeddedResource Include="Views\shared\*.css;Views\shared\*.js" LogicalName="views/shared/%(Filename)%(Extension)" WithCulture="false" />
+    <ViewsSource Include="$(ViewsProjectDir)src\**\*;$(ViewsProjectDir)views\*.html" />
+    <ViewsSource Include="$(ViewsProjectDir)package-lock.json;$(ViewsProjectDir)build.js;$(ViewsProjectDir)vite.config.ts;$(ViewsProjectDir)tsconfig.json" />
+    <ViewsOutput Include="$(ViewsDistDir)month-overview.html;$(ViewsDistDir)cash-flow-forecast.html;$(ViewsDistDir)subscriptions.html" />
   </ItemGroup>
+
+  <!-- Not in the design-time builds of the IDE, which must stay fast. -->
+  <Target Name="CheckNodeForViews" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="node --version" ContinueOnError="true" StandardOutputImportance="low" IgnoreExitCode="true">
+      <Output TaskParameter="ExitCode" PropertyName="NodeExitCode" />
+    </Exec>
+    <Error Condition="'$(NodeExitCode)' != '0'" Text="Node.js 24 is required to build the MCP Apps views (src/Hestia.Room.Finance.Views): see the README." />
+  </Target>
+
+  <!-- npm ci only when the lock file is newer than the installed packages (npm writes node_modules/.package-lock.json). -->
+  <Target Name="RestoreViews" DependsOnTargets="CheckNodeForViews" Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="$(ViewsProjectDir)package-lock.json" Outputs="$(ViewsProjectDir)node_modules\.package-lock.json">
+    <Exec Command="npm ci --no-audit --no-fund" WorkingDirectory="$(ViewsProjectDir)" />
+  </Target>
+
+  <Target Name="BuildViews" BeforeTargets="BeforeBuild" DependsOnTargets="RestoreViews" Condition="'$(DesignTimeBuild)' != 'true'"
+          Inputs="@(ViewsSource)" Outputs="@(ViewsOutput)">
+    <Exec Command="npm run build" WorkingDirectory="$(ViewsProjectDir)" />
+  </Target>
+
+  <!--
+    Added after the views build, never skipped: the built files do not exist yet when the project is evaluated.
+    Explicit resource names (views/...): the default name depends on the root namespace and rewrites folder names.
+  -->
+  <Target Name="EmbedViews" AfterTargets="BuildViews" BeforeTargets="BeforeBuild">
+    <ItemGroup>
+      <EmbeddedResource Include="@(ViewsOutput)" LogicalName="views/%(Filename)%(Extension)" WithCulture="false" />
+    </ItemGroup>
+  </Target>
 
 </Project>

@@ -24,6 +24,17 @@ beforeEach(() => {
 
 const texts = (selector: string) => [...content.querySelectorAll(selector)].map(node => plain(node.textContent));
 
+describe("view definitions", () => {
+  it.each([
+    [monthOverview.tool, "show_month_overview"],
+    [cashFlowForecast.tool, "show_cash_flow_forecast"],
+    [subscriptions.tool, "show_subscriptions"],
+  ])("a view changes month through its own tool: %s", (tool, expected) => {
+    // Written as literals: the view tool names are a contract with the server (tested on the server side too).
+    expect(tool).toBe(expected);
+  });
+});
+
 describe("month overview", () => {
   it("shows the planned and actual savings capacity, then the figures side by side", () => {
     monthOverview.render(demoMonth, content, 640);

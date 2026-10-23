@@ -52,7 +52,7 @@ public class ViewFixturesTests(McpServerFixture mcp)
     }
 
     /// <summary>The views project, found from the test binaries up to the solution file.</summary>
-    private static string ViewsProjectDirectory()
+    internal static string ViewsProjectDirectory()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "Hestia.Room.Finance.slnx")))
