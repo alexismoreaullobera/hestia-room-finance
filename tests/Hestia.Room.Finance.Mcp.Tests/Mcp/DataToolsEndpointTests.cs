@@ -1,7 +1,11 @@
+using System.Globalization;
 using System.Text.Json.Nodes;
 using Hestia.Room.Finance.Domain;
+using Hestia.Room.Finance.Infrastructure;
 using Hestia.Room.Finance.Infrastructure.Demo;
 using Hestia.Room.Finance.Mcp.Tools.Outputs;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 
@@ -20,6 +24,16 @@ public class DataToolsEndpointTests(McpServerFixture mcp)
 
     private readonly McpTestClient _mcp = new(mcp.Server.CreateClient());
 
+    [Fact]
+    public void TheServer_UsesTheTestDatabase_NeverTheLocalOne()
+    {
+        using var scope = mcp.Server.Services.CreateScope();
+
+        var connectionString = scope.ServiceProvider.GetRequiredService<FinanceDbContext>().Database.GetConnectionString();
+
+        Assert.StartsWith("finance_test_", new Microsoft.Data.SqlClient.SqlConnectionStringBuilder(connectionString).InitialCatalog);
+    }
+
     [Theory]
     [MemberData(nameof(DataTools))]
     public async Task ToolsList_AnnouncesADataToolAsReadOnly_WithAMonthArgumentAndAnOutputSchema(string name)
@@ -29,7 +43,10 @@ public class DataToolsEndpointTests(McpServerFixture mcp)
         Assert.True((bool?)tool["annotations"]?["readOnlyHint"]);
         Assert.True((bool?)tool["annotations"]?["idempotentHint"]);
         Assert.False((bool?)tool["annotations"]?["openWorldHint"]);
-        Assert.NotNull(tool["inputSchema"]?["properties"]?["month"]);
+        // The only argument asked of the model: the reader, the clock and the cancellation token stay out of it.
+        Assert.Equal(["month"], tool["inputSchema"]!["properties"]!.AsObject().Select(p => p.Key));
+        // Optional: the agent may leave it out to read the current month.
+        Assert.DoesNotContain("month", tool["inputSchema"]?["required"]?.AsArray().Select(r => (string?)r) ?? []);
         Assert.Equal("object", (string?)tool["outputSchema"]?["type"]);
     }
 
@@ -57,7 +74,7 @@ public class DataToolsEndpointTests(McpServerFixture mcp)
         Assert.Equal(Current.ToString(), (string?)content["month"]);
         Assert.Equal(expected.StartingBalance, (decimal?)content["startingBalance"]);
         Assert.Equal(expected.LowPoint.Balance, (decimal?)content["lowPoint"]?["balance"]);
-        Assert.Equal(expected.LowPoint.Date.ToString("yyyy-MM-dd"), (string?)content["lowPoint"]?["date"]);
+        Assert.Equal(expected.LowPoint.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), (string?)content["lowPoint"]?["date"]);
         Assert.Equal(expected.CashBuffer, (decimal?)content["cashBuffer"]);
         Assert.True((bool?)content["hasAlert"], "The demo is meant to show the alert of the current month.");
         Assert.Equal(Current.DaysInMonth, content["days"]!.AsArray().Count);
@@ -77,14 +94,24 @@ public class DataToolsEndpointTests(McpServerFixture mcp)
     }
 
     [Fact]
-    public async Task Lists_GiveTheLinesAndTheSubscriptionsOfTheDemo()
+    public async Task ListRecurringLines_GivesTheLinesOfTheDemo_InOrder()
     {
         var lines = (await _mcp.CallToolAsync("list_recurring_lines"))["structuredContent"]!["lines"]!.AsArray();
-        var subscriptions = (await _mcp.CallToolAsync("list_subscriptions"))["structuredContent"]!;
 
-        Assert.Equal(Demo.Lines.Count(l => l.IsActiveIn(Current)), lines.Count);
-        Assert.Equal(Demo.Lines.Count(l => l.IsSubscription && l.IsActiveIn(Current)), subscriptions["subscriptions"]!.AsArray().Count);
-        Assert.Equal(SubscriptionsOutput.From(DemoMonth(Current)).YearlyTotal, (decimal?)subscriptions["yearlyTotal"]);
+        // By name: the identifiers differ from one DemoPlan.For call to another.
+        Assert.Equal(RecurringLinesOutput.From(DemoMonth(Current)).Lines.Select(l => l.Name), lines.Select(l => (string)l!["name"]!));
+    }
+
+    [Fact]
+    public async Task ListSubscriptions_GivesTheSubscriptionsOfTheDemo_InOrder_WithTheirTotals()
+    {
+        var expected = SubscriptionsOutput.From(DemoMonth(Current));
+
+        var content = (await _mcp.CallToolAsync("list_subscriptions"))["structuredContent"]!;
+
+        Assert.Equal(expected.Subscriptions.Select(s => s.Name), content["subscriptions"]!.AsArray().Select(s => (string)s!["name"]!));
+        Assert.Equal(expected.MonthlyTotal, (decimal?)content["monthlyTotal"]);
+        Assert.Equal(expected.YearlyTotal, (decimal?)content["yearlyTotal"]);
     }
 
     [Fact]
@@ -95,6 +122,16 @@ public class DataToolsEndpointTests(McpServerFixture mcp)
 
         Assert.True((bool?)result["isError"]);
         Assert.Contains("YYYY-MM", Text(result));
+    }
+
+    [Fact]
+    public async Task ToolsCall_WithAMonthOfTheWrongType_IsAToolErrorWithAGenericMessage()
+    {
+        // Not a McpException: the SDK hides the details (no stack, no internal message) behind a generic message.
+        var result = await _mcp.CallToolAsync("get_month_summary", new JsonObject { ["month"] = 202704 });
+
+        Assert.True((bool?)result["isError"]);
+        Assert.Equal("An error occurred invoking 'get_month_summary'.", Text(result));
     }
 
     private async Task<JsonNode> ToolAsync(string name) =>

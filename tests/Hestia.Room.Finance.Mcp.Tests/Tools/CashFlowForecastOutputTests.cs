@@ -53,11 +53,52 @@ public class CashFlowForecastOutputTests
     }
 
     [Fact]
-    public void Describe_WithoutAlert_SaysTheBalanceStaysPositive()
+    public void Describe_WithoutAlert_SaysTheBalanceStaysAboveZero_AndGivesTheBuffer()
     {
         var text = Forecast(startingBalance: 1000m).Describe();
 
-        Assert.Contains("Pas d'alerte", text);
+        Assert.Contains("Pas d'alerte : le solde ne passe pas sous zéro", text);
+        Assert.Contains($"coussin de trésorerie nécessaire : {650m.ToString("C", French)}", text);
         Assert.DoesNotContain("Alerte :", text);
+    }
+
+    [Fact]
+    public void Describe_AMonthStartingOverdrawn_WithNothingDiggingDeeper_SaysSoWithoutAnEmptyList()
+    {
+        // -100 € on the 1st, then only the salary: below zero, but the month itself needs no buffer.
+        var output = CashFlowForecastOutput.From(April2026(-100m, [Monthly(FlowKind.Income, "Salaire", 2000m, day: 28)]).Forecast());
+
+        var text = output.Describe();
+
+        Assert.True(output.HasAlert);
+        Assert.Equal(0m, output.CashBuffer);
+        Assert.Contains("Le compte démarre déjà à découvert", text);
+        Assert.DoesNotContain("au moins", text);
+        Assert.DoesNotContain("Débits qui creusent", text);
+    }
+
+    [Fact]
+    public void Describe_AnAlertDugByBudgetsOnly_GivesTheBufferWithoutAnEmptyList()
+    {
+        // Budgets have no date: they dig the balance every day, and are never listed as debits.
+        var groceries = new Budget(Guid.CreateVersion7(), "Courses", 300m);
+        var output = CashFlowForecastOutput.From(April2026(0m, [], [groceries]).Forecast());
+
+        var text = output.Describe();
+
+        Assert.True(output.HasAlert);
+        Assert.Empty(output.ContributingDebits);
+        Assert.Contains($"au moins {300m.ToString("C", French)}", text);
+        Assert.DoesNotContain("Débits qui creusent", text);
+    }
+
+    [Fact]
+    public void Describe_AnEmptyMonth_HasNoAlert()
+    {
+        var output = CashFlowForecastOutput.From(April2026(0m, []).Forecast());
+
+        Assert.False(output.HasAlert);
+        Assert.Equal(30, output.Days.Count);
+        Assert.Contains("Pas d'alerte", output.Describe());
     }
 }

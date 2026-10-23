@@ -92,6 +92,8 @@ public class YearMonthTests
     [InlineData("2026-+4")]
     [InlineData("2026-04-01")]
     [InlineData("avril 2026")]
+    [InlineData("２０２６-04")] // full-width digits: ASCII digits only
+    [InlineData("٢٠٢٦-04")] // Arabic-Indic digits
     public void TryParse_RejectsAnythingElse(string? text)
     {
         Assert.False(YearMonth.TryParse(text, out var month));

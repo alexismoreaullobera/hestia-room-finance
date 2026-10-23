@@ -32,6 +32,10 @@ public class DevelopmentDatabaseTests(SqlServerFixture sqlServer)
 
         // The next start: nothing left to migrate, and the plan is already there.
         Assert.False(await provider.PrepareDevelopmentDatabaseAsync(CurrentMonth, Token));
+
+        await using var scope = provider.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
+        Assert.Equal(DemoPlan.For(CurrentMonth).Lines.Count, await context.RecurringLines.CountAsync(Token));
     }
 
     private static ServiceProvider Services(string connectionString) =>

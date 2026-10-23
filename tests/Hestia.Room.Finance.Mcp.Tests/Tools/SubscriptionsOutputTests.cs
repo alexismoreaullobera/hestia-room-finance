@@ -23,6 +23,19 @@ public class SubscriptionsOutputTests
     }
 
     [Fact]
+    public void Subscriptions_OnTheSameDay_AreOrderedByName()
+    {
+        // Written in the reverse order on purpose: the order comes from the projection, not from the plan.
+        var output = SubscriptionsOutput.From(April2026(0m,
+        [
+            Subscription("Forfait mobile", 12.99m, day: 8),
+            Subscription("Box internet", 29.99m, day: 8),
+        ]));
+
+        Assert.Equal(["Box internet", "Forfait mobile"], output.Subscriptions.Select(s => s.Name));
+    }
+
+    [Fact]
     public void Totals_AreTheMonthlyAndYearlyCosts()
     {
         Assert.Equal(48.39m, Output.MonthlyTotal);
@@ -31,7 +44,7 @@ public class SubscriptionsOutputTests
     }
 
     [Fact]
-    public void MonthlyTotal_RoundsTheSumOfTheExactAmounts_NotASumOfRoundedAmounts()
+    public void QuarterlySubscriptions_KeepTheirAmount_AndTotalsRoundTheExactSum()
     {
         // Two 10 € quarterly subscriptions: 3.333… € each. Rounded once: 6.67 €; rounded each: 6.66 €.
         var output = SubscriptionsOutput.From(April2026(0m,
@@ -41,7 +54,13 @@ public class SubscriptionsOutputTests
         ]));
 
         Assert.Equal(6.67m, output.MonthlyTotal);
-        Assert.All(output.Subscriptions, s => Assert.Equal(3.33m, s.MonthlyEquivalent));
+        Assert.Equal(80m, output.YearlyTotal);
+        Assert.All(output.Subscriptions, s =>
+        {
+            Assert.Equal(10m, s.Amount);
+            Assert.Equal(3.33m, s.MonthlyEquivalent);
+            Assert.Equal(40m, s.YearlyCost);
+        });
     }
 
     [Fact]
@@ -61,7 +80,18 @@ public class SubscriptionsOutputTests
         Assert.StartsWith(
             $"Abonnements en cours pour avril 2026 : 2, soit {48.39m.ToString("C", French)} par mois et {580.68m.ToString("C", French)} par an.",
             text);
-        Assert.Contains("débit le 03/04, engagement jusqu'au 31/12/2026", text);
+        Assert.Contains("débit le 03/04, engagement jusqu'au 31/12/2026)", text);
+        // No commitment: the parenthesis closes right after the debit date.
+        Assert.Contains($"Streaming {13.49m.ToString("C", French)} (mensuel, débit le 20/04).", text);
+    }
+
+    [Fact]
+    public void Describe_ASubscriptionNotDueThisMonth_SaysSo()
+    {
+        var output = SubscriptionsOutput.From(April2026(0m, [Quarterly("Presse", 10m, day: 1, anchorMonth: 2, new SubscriptionInfo())]));
+
+        Assert.Null(output.Subscriptions.Single().DueDate);
+        Assert.Contains("(trimestriel, pas de débit ce mois-ci)", output.Describe());
     }
 
     [Fact]

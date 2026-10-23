@@ -43,16 +43,43 @@ public class RecurringLinesOutputTests
     }
 
     [Fact]
-    public void StructuredContent_WritesTheEnumsAsText()
+    public void MonthlyEquivalent_RoundsAHalfCentAwayFromZero()
     {
-        // As the tool serializes it: the agent reads "Income", never a number.
-        var json = JsonSerializer.SerializeToElement(Output, McpJsonUtilities.DefaultOptions);
+        // 30.06 € a year: 2.505 € a month, shown 2.51 € (the banker's rounding would give 2.50 €).
+        var output = RecurringLinesOutput.From(April2026(0m, [Yearly("Antivirus", 30.06m, day: 10, anchorMonth: 9)]));
+
+        Assert.Equal(2.51m, output.Lines.Single().MonthlyEquivalent);
+    }
+
+    [Fact]
+    public void Lines_OnTheSameDay_AreOrderedByName()
+    {
+        var output = RecurringLinesOutput.From(April2026(0m,
+        [
+            Monthly(FlowKind.Expense, "Forfait mobile", 12.99m, day: 8),
+            Monthly(FlowKind.Expense, "Box internet", 29.99m, day: 8),
+        ]));
+
+        Assert.Equal(["Box internet", "Forfait mobile"], output.Lines.Select(l => l.Name));
+    }
+
+    [Theory]
+    [MemberData(nameof(SerializerOptions))]
+    public void StructuredContent_WritesTheEnumsAsText(string options)
+    {
+        // With the SDK options, as the tool does, and with plain web options that have no enum converter:
+        // the explicit converters of the output make the contract, whatever the options.
+        var json = JsonSerializer.SerializeToElement(Output, options == "sdk"
+            ? McpJsonUtilities.DefaultOptions
+            : new JsonSerializerOptions(JsonSerializerDefaults.Web));
         var salary = json.GetProperty("lines")[0];
 
         Assert.Equal("Income", salary.GetProperty("kind").GetString());
         Assert.Equal("Monthly", salary.GetProperty("frequency").GetString());
         Assert.Equal("Other", salary.GetProperty("category").GetString());
     }
+
+    public static TheoryData<string> SerializerOptions => ["sdk", "web"];
 
     [Fact]
     public void Describe_ListsIncomesAndExpensesWithTheirDate()

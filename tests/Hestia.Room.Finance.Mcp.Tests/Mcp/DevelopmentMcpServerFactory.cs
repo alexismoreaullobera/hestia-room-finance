@@ -1,4 +1,5 @@
 using Hestia.Room.Finance.Domain;
+using Hestia.Room.Finance.Mcp.Time;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -14,15 +15,18 @@ namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 /// </summary>
 public sealed class DevelopmentMcpServerFactory(string connectionString) : WebApplicationFactory<Program>
 {
-    /// <summary>The month the server believes it is: the demo is seeded for it, and the tools default to it.</summary>
-    // Not the real month on purpose: a server ignoring the injected clock would be caught.
-    public static readonly YearMonth CurrentMonth = new(2027, 3);
+    /// <summary>
+    /// The time the server believes it is: mid-March 2027 in Paris. Not the real month on purpose, so that a server
+    /// ignoring the injected clock is caught; and fixed, so that the expected figures do not depend on the run day.
+    /// </summary>
+    public static readonly DateTimeOffset Now = new(2027, 3, 15, 10, 0, 0, TimeSpan.Zero);
+
+    /// <summary>The month of <see cref="Now"/> in Paris: the demo is seeded for it, and the tools default to it.</summary>
+    public static readonly YearMonth CurrentMonth = new FinanceClock(new FakeTimeProvider(Now)).CurrentMonth();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder) => builder
         .UseEnvironment("Development")
         // Takes precedence over the user secrets of the developer machine: the tests never touch the local database.
         .UseSetting("ConnectionStrings:Finance", connectionString)
-        // A fixed clock, mid-March 2027 in Paris: the expected figures do not depend on the day the tests run.
-        .ConfigureTestServices(services => services.AddSingleton<TimeProvider>(
-            new FakeTimeProvider(new DateTimeOffset(2027, 3, 15, 10, 0, 0, TimeSpan.Zero))));
+        .ConfigureTestServices(services => services.AddSingleton<TimeProvider>(new FakeTimeProvider(Now)));
 }

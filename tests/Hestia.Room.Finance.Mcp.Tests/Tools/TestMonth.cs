@@ -16,9 +16,13 @@ internal static class TestMonth
     public static RecurringLine QuarterlyInApril(string name, decimal amount, int day) =>
         new(Guid.CreateVersion7(), FlowKind.Expense, name, amount, Frequency.Quarterly, day, LongAgo, anchorMonth: 4);
 
-    public static RecurringLine Quarterly(string name, decimal amount, int day, int anchorMonth, SubscriptionInfo? subscription = null) =>
-        new(Guid.CreateVersion7(), FlowKind.Expense, name, amount, Frequency.Quarterly, day, LongAgo, anchorMonth,
-            subscription: subscription);
+    /// <summary>A quarterly line, due in April only when its anchor month is 1, 4, 7 or 10.</summary>
+    public static RecurringLine Quarterly(
+        string name, decimal amount, int day, int anchorMonth, SubscriptionInfo? subscription = null, FlowKind kind = FlowKind.Expense) =>
+        new(Guid.CreateVersion7(), kind, name, amount, Frequency.Quarterly, day, LongAgo, anchorMonth, subscription: subscription);
+
+    public static RecurringLine Yearly(string name, decimal amount, int day, int anchorMonth) =>
+        new(Guid.CreateVersion7(), FlowKind.Expense, name, amount, Frequency.Yearly, day, LongAgo, anchorMonth);
 
     public static RecurringLine Subscription(string name, decimal amount, int day, DateOnly? commitmentEnd = null) =>
         new(Guid.CreateVersion7(), FlowKind.Expense, name, amount, Frequency.Monthly, day, LongAgo,

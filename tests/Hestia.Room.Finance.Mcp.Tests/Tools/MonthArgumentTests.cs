@@ -36,4 +36,16 @@ public class MonthArgumentTests
         Assert.Contains(month, error.Message);
         Assert.Contains("YYYY-MM", error.Message);
     }
+
+    [Fact]
+    public void Resolve_WithALongInvalidMonth_DoesNotEchoIt()
+    {
+        // The message goes back into the model context: a long value is never copied there.
+        var month = new string('x', 200);
+
+        var error = Assert.Throws<McpException>(() => MonthArgument.Resolve(month, InOctober2026));
+
+        Assert.DoesNotContain(month, error.Message);
+        Assert.Contains("too long", error.Message);
+    }
 }
