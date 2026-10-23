@@ -1,4 +1,5 @@
 using Hestia.Room.Finance.Infrastructure.Demo;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
@@ -43,10 +44,11 @@ public class FinanceInfrastructureTests
         using var scope = provider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
 
-        var sqlServer = RelationalOptionsExtension.Extract(context.GetService<IDbContextOptions>());
-
-        Assert.Equal("Server=offline", sqlServer.ConnectionString);
-        Assert.Equal(FinanceDbContext.Schema, sqlServer.MigrationsHistoryTableSchema);
+        // SqlClient normalizes the connection string (Data Source, Application Name): compare the server it targets.
+        Assert.Equal("offline", new SqlConnectionStringBuilder(context.Database.GetConnectionString()).DataSource);
+        // No public API reads the history table settings back: the relational options extension holds them.
+        Assert.Equal(FinanceDbContext.Schema,
+            RelationalOptionsExtension.Extract(context.GetService<IDbContextOptions>()).MigrationsHistoryTableSchema);
     }
 
     [Theory]

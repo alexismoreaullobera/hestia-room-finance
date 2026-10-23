@@ -43,10 +43,8 @@ public class DataToolsEndpointTests(McpServerFixture mcp)
 
         Assert.False((bool?)result["isError"] ?? false);
         Assert.Contains("mars 2027", Text(result));
-        var content = result["structuredContent"]!.AsObject();
-        var properties = schema["properties"]!.AsObject().Select(p => p.Key).ToHashSet();
-        Assert.All(content, property => Assert.Contains(property.Key, properties));
-        Assert.All(schema["required"]?.AsArray() ?? [], required => Assert.True(content.ContainsKey((string)required!)));
+        // At every level: a property dropped deep in a list (a null date) breaks a client validating the result.
+        SchemaAssert.Matches(schema, result["structuredContent"]!);
     }
 
     [Fact]

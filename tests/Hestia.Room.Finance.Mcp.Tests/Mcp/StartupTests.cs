@@ -8,8 +8,11 @@ public class StartupTests
     [Fact]
     public void Server_WithoutConnectionString_RefusesToStartWithAClearMessage()
     {
-        // Production: no user secrets, and no connection string in the committed settings.
-        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder.UseEnvironment("Production"));
+        // Production (no user secrets), and an empty connection string set by the test itself: a machine-level
+        // ConnectionStrings__Finance environment variable cannot make the server start.
+        using var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder => builder
+            .UseEnvironment("Production")
+            .UseSetting("ConnectionStrings:Finance", ""));
 
         var error = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
 

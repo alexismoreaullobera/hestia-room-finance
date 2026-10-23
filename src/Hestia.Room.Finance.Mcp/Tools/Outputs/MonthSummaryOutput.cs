@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Hestia.Room.Finance.Domain;
+using static Hestia.Room.Finance.Mcp.Tools.Outputs.Amounts;
 using static Hestia.Room.Finance.Mcp.Tools.Outputs.FrenchText;
 
 namespace Hestia.Room.Finance.Mcp.Tools.Outputs;
@@ -8,7 +9,9 @@ namespace Hestia.Room.Finance.Mcp.Tools.Outputs;
 public sealed record MonthSummaryOutput(
     [property: Description("Month, as YYYY-MM.")] string Month,
     [property: Description("From the plan: recurring lines and planned budgets.")] SummaryFigures Planned,
-    [property: Description("With the actual figures entered for the month (budget actuals, overrides of recurring lines), the plan elsewhere.")]
+    [property: Description("With the actual figures entered for the month (budget actuals, overrides of recurring lines), the plan "
+        + "elsewhere. Its smoothed incomes and recurring expenses stay those of the plan; its smoothed savings capacity uses the "
+        + "actual budgets.")]
     SummaryFigures Actual)
 {
     public static MonthSummaryOutput From(FinanceMonth month) => new(
@@ -49,5 +52,5 @@ public sealed record SummaryFigures(
     internal string Describe() =>
         $"entrées {Euros(Incomes)}, dépenses récurrentes {Euros(RecurringExpenses)}, budgets {Euros(Budgets)}, "
         + $"capacité d'épargne {Euros(SavingsCapacity)} "
-        + $"(sur un mois moyen, en lissant les dépenses trimestrielles et annuelles : {Euros(SmoothedSavingsCapacity)})";
+        + $"(sur un mois moyen, en lissant les lignes trimestrielles et annuelles : {Euros(SmoothedSavingsCapacity)})";
 }

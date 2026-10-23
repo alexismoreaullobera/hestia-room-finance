@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Hestia.Room.Finance.Domain;
+using static Hestia.Room.Finance.Mcp.Tools.Outputs.Amounts;
 using static Hestia.Room.Finance.Mcp.Tools.Outputs.FrenchText;
 
 namespace Hestia.Room.Finance.Mcp.Tools.Outputs;
@@ -33,13 +34,19 @@ public sealed record CashFlowForecastOutput(
 
         if (!HasAlert)
         {
-            return $"{start} Pas d'alerte : le solde reste positif tout le mois "
+            return $"{start} Pas d'alerte : le solde ne passe pas sous zéro "
                 + $"(coussin de trésorerie nécessaire : {Euros(CashBuffer)}).";
         }
 
-        var debits = string.Join(", ", ContributingDebits.Select(d => $"{d.Name} ({Euros(d.Amount)}, le {Day(d.Date)})"));
-        return $"{start} Alerte : le compte passe sous zéro. Il faudrait démarrer le mois avec au moins "
-            + $"{Euros(CashBuffer)} pour l'éviter. Débits qui creusent ce point bas : {debits}.";
+        // No buffer needed although the balance is below zero: the month starts overdrawn, nothing digs deeper.
+        var cause = CashBuffer > 0m
+            ? $"Il faudrait démarrer le mois avec au moins {Euros(CashBuffer)} pour l'éviter."
+            : "Le compte démarre déjà à découvert : les mouvements du mois ne le creusent pas davantage.";
+        var debits = ContributingDebits.Count > 0
+            ? " Débits qui creusent ce point bas : "
+                + string.Join(", ", ContributingDebits.Select(d => $"{d.Name} ({Euros(d.Amount)}, le {Day(d.Date)})")) + "."
+            : "";
+        return $"{start} Alerte : le compte passe sous zéro. {cause}{debits}";
     }
 }
 

@@ -45,7 +45,7 @@ Hestia.Room.Finance.Domain          business rules and calculations, pure C#: no
 - **Dependencies point inward**: the domain depends on nothing; the infrastructure depends on the domain, never the reverse.
 - **Persistence models are separate from the domain**: EF Core maps plain rows (`Rows/`), converted explicitly to domain objects, so storage constraints never leak into the business rules, and an invalid row is rejected on read.
 - **Calculations are done by the code, never by the LLM**: tools compute, the agent explains.
-- **Thin tools**: a tool loads one month through the reader, then projects it into its output; the reader and the clock are injected in the scope of the HTTP request.
+- **Thin tools**: a tool loads one month through the reader, then projects it into its output; the reader is injected per HTTP request (scoped, with its DbContext), the clock is a singleton.
 
 ## Quickstart
 
@@ -62,11 +62,13 @@ Hestia.Room.Finance.Domain          business rules and calculations, pure C#: no
    ```bash
    docker compose up -d
    ```
-3. Give the server its connection string, once, in the .NET user secrets (stored in your user profile, outside the repository). The password is typed at a hidden prompt, so it never lands in the shell history:
+3. Give the server its connection string, once, in the .NET user secrets (stored in your user profile, outside the repository). The password is typed at a hidden prompt, so it never lands in the shell history, and goes through the standard input (`printf` is a shell builtin), so it never shows in the process list either:
    ```bash
    read -rsp "SQL Server password: " SA_PASSWORD && echo
-   dotnet user-secrets set ConnectionStrings:Finance "Server=127.0.0.1,1433;Database=HestiaFinance;User Id=sa;Password=$SA_PASSWORD;Encrypt=True;TrustServerCertificate=True" --project src/Hestia.Room.Finance.Mcp
+   printf '{"ConnectionStrings:Finance":"Server=127.0.0.1,1433;Database=HestiaFinance;User Id=sa;Password=%s;Encrypt=True;TrustServerCertificate=True"}' "$SA_PASSWORD" | dotnet user-secrets set --project src/Hestia.Room.Finance.Mcp
+   unset SA_PASSWORD
    ```
+   The password is written into JSON and into a connection string: it must not contain `"`, `\` or `;`.
 4. Run the server:
    ```bash
    dotnet run --project src/Hestia.Room.Finance.Mcp
@@ -82,15 +84,15 @@ Hestia.Room.Finance.Domain          business rules and calculations, pure C#: no
 
 ## Migrations
 
-The server migrates its database at startup in Development. To apply the migrations by hand, or to add one, use the `dotnet-ef` version pinned in `dotnet-tools.json`, with the connection string in the `HESTIA_FINANCE_CONNECTION` environment variable (never written in the code):
+The server migrates its database at startup in Development. To apply the migrations by hand, or to add one, use the `dotnet-ef` version pinned in `dotnet-tools.json`, with the connection string in the `HESTIA_FINANCE_CONNECTION` environment variable (never written in the code), set for that one command only:
 
 ```bash
 dotnet tool restore
 ```
 ```bash
 read -rsp "SQL Server password: " SA_PASSWORD && echo
-export HESTIA_FINANCE_CONNECTION="Server=127.0.0.1,1433;Database=HestiaFinance;User Id=sa;Password=$SA_PASSWORD;Encrypt=True;TrustServerCertificate=True"
-dotnet ef database update --project src/Hestia.Room.Finance.Infrastructure
+HESTIA_FINANCE_CONNECTION="Server=127.0.0.1,1433;Database=HestiaFinance;User Id=sa;Password=$SA_PASSWORD;Encrypt=True;TrustServerCertificate=True" dotnet ef database update --project src/Hestia.Room.Finance.Infrastructure
+unset SA_PASSWORD
 ```
 
 ## Tests

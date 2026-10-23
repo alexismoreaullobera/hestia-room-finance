@@ -12,7 +12,8 @@ namespace Hestia.Room.Finance.Mcp.Tools;
 /// <summary>
 /// Read-only data tools, called by the agent. Each tool loads one month, then projects it: a structured output
 /// (with its advertised schema) and a self-sufficient text summary. The calculations are done by the domain, never
-/// by the model. The reader and the clock come from dependency injection, in the scope of the HTTP request.
+/// by the model. The reader and the clock come from dependency injection: the reader is scoped (one per HTTP request,
+/// with its DbContext), the clock is a singleton.
 /// </summary>
 [McpServerToolType]
 public sealed class FinanceDataTools

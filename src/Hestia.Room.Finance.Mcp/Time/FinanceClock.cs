@@ -10,8 +10,10 @@ namespace Hestia.Room.Finance.Mcp.Time;
 public sealed class FinanceClock(TimeProvider time)
 {
     // IANA identifier: known by .NET on Linux and on Windows. A Linux container image needs its tzdata package.
-    private static readonly TimeZoneInfo Paris = TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris");
+    // Resolved by the constructor, not by a static initializer: the server creates the clock at startup, so a missing
+    // time zone stops the startup with a clear error instead of failing the first tool call.
+    private readonly TimeZoneInfo _paris = TimeZoneInfo.FindSystemTimeZoneById("Europe/Paris");
 
     public YearMonth CurrentMonth() =>
-        YearMonth.From(DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(time.GetUtcNow(), Paris).DateTime));
+        YearMonth.From(DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(time.GetUtcNow(), _paris).DateTime));
 }

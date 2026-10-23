@@ -16,11 +16,19 @@ public sealed class McpServerFixture : IAsyncLifetime
     {
         await _sqlServer.InitializeAsync();
         Server = new DevelopmentMcpServerFactory(_sqlServer.NewDatabaseConnectionString());
+        // Started here, not lazily by the first test: a failing startup (migrations, seed) fails the fixture once,
+        // with its own error, instead of every test in turn.
+        Server.StartServer();
     }
 
     public async ValueTask DisposeAsync()
     {
-        await Server.DisposeAsync();
+        // Null when the container did not start (no Docker): the original error stays visible.
+        if (Server is not null)
+        {
+            await Server.DisposeAsync();
+        }
+
         await _sqlServer.DisposeAsync();
     }
 }

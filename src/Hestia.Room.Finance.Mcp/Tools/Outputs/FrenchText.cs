@@ -8,14 +8,13 @@ internal static class FrenchText
 {
     private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
 
-    /// <summary>The domain keeps exact amounts (a 100 € quarterly line weighs 33.333… € a month); outputs show cents.</summary>
-    public static decimal Cents(decimal amount) => Math.Round(amount, 2, MidpointRounding.AwayFromZero);
+    public static string Euros(decimal amount) => Amounts.Cents(amount).ToString("C", French);
 
-    public static string Euros(decimal amount) => Cents(amount).ToString("C", French);
-
-    /// <summary>"octobre 2026" for "2026-10", the month format of the outputs.</summary>
+    /// <summary>"octobre 2026" for "2026-10", the month format of the outputs (written by the outputs themselves).</summary>
     public static string MonthName(string month) =>
-        YearMonth.TryParse(month, out var parsed) ? parsed.FirstDay.ToString("MMMM yyyy", French) : month;
+        YearMonth.TryParse(month, out var parsed)
+            ? parsed.FirstDay.ToString("MMMM yyyy", French)
+            : throw new InvalidOperationException($"'{month}' is not an output month (YYYY-MM).");
 
     public static string Day(DateOnly date) => date.ToString("dd/MM", French);
 

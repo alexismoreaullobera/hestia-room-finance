@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json.Serialization;
 using Hestia.Room.Finance.Domain;
+using static Hestia.Room.Finance.Mcp.Tools.Outputs.Amounts;
 using static Hestia.Room.Finance.Mcp.Tools.Outputs.FrenchText;
 
 namespace Hestia.Room.Finance.Mcp.Tools.Outputs;
@@ -14,7 +15,7 @@ public sealed record RecurringLinesOutput(
     public static RecurringLinesOutput From(FinanceMonth month) => new(
         month.Month.ToString(),
         [.. month.Lines
-            .OrderBy(line => line.Kind)
+            .OrderByDescending(line => line.Kind == FlowKind.Income)
             .ThenBy(line => line.DayOfMonth)
             .ThenBy(line => line.Name, StringComparer.Ordinal)
             .Select(line => RecurringLineOutput.From(line, month.Month))]);
@@ -33,12 +34,15 @@ public sealed record RecurringLinesOutput(
             + $"Entrées : {JoinOrNone(incomes)}. Dépenses : {JoinOrNone(expenses)}.";
     }
 
-    private static string JoinOrNone(IEnumerable<string> items) => items.Any() ? string.Join(" ; ", items) : "aucune";
+    private static string JoinOrNone(IEnumerable<string> items) =>
+        string.Join(" ; ", items) is { Length: > 0 } joined ? joined : "aucune";
 }
 
 /// <remarks>
 /// Enums are written as text by explicit converters: the SDK default options also do it, but only when reflection is
 /// enabled (not with native AOT). The contract read by the agent does not depend on that default.
+/// Nullable dates are always written, null included: the SDK default options drop nulls, while the generated output
+/// schema lists every property as required.
 /// </remarks>
 public sealed record RecurringLineOutput(
     Guid Id,
@@ -49,6 +53,7 @@ public sealed record RecurringLineOutput(
     [property: JsonConverter(typeof(JsonStringEnumConverter<Category>))] Category Category,
     [property: Description("Day of the month it falls due (29 to 31: the last day of shorter months).")] int DayOfMonth,
     [property: Description("Date it falls due in this month, or null if it is not due this month (quarterly or yearly line).")]
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.Never)]
     DateOnly? DueDate,
     [property: Description("What it weighs on an average month (a 360 € yearly line weighs 30 €).")] decimal MonthlyEquivalent,
     bool IsSubscription)

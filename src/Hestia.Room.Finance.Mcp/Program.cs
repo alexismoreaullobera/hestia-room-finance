@@ -42,13 +42,17 @@ builder.Services.AddCors(options => options.AddPolicy(DevHostsCorsPolicy, policy
 
 var app = builder.Build();
 
+// Created now in every environment: a missing time zone stops the startup instead of failing the first tool call.
+var clock = app.Services.GetRequiredService<FinanceClock>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseCors(DevHostsCorsPolicy);
 
     // Development only: migrations and demo plan at startup. In production, the deployment pipeline migrates.
-    var currentMonth = app.Services.GetRequiredService<FinanceClock>().CurrentMonth();
-    if (await app.Services.PrepareDevelopmentDatabaseAsync(currentMonth))
+    var currentMonth = clock.CurrentMonth();
+    var demoSeeded = await app.Services.PrepareDevelopmentDatabaseAsync(currentMonth, app.Lifetime.ApplicationStopping);
+    if (demoSeeded)
     {
         app.Logger.LogInformation("Development database ready: demo plan seeded for {Month}.", currentMonth);
     }

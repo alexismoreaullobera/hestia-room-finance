@@ -12,8 +12,9 @@ public static class FinanceInfrastructure
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
-        // Scoped (the default of AddDbContext): one context per HTTP request, never shared between two requests,
-        // since a DbContext is not thread-safe. The reader and the seeder use it, so they are scoped too.
+        // Scoped (the default of AddDbContext): one context per dependency injection scope, which a web host creates
+        // per request, never shared between two scopes since a DbContext is not thread-safe. The reader and the seeder
+        // use it, so they are scoped too.
         services.AddDbContext<FinanceDbContext>(options => options.UseRoomSqlServer(connectionString));
         services.AddScoped<FinancePlanReader>();
         services.AddScoped<DemoDataSeeder>();
@@ -28,7 +29,7 @@ public static class FinanceInfrastructure
     public static async Task<bool> PrepareDevelopmentDatabaseAsync(
         this IServiceProvider services, YearMonth currentMonth, CancellationToken cancellationToken = default)
     {
-        // Startup runs outside any HTTP request: a dedicated scope for the scoped services, disposed right after.
+        // Called outside any scope (at startup): a dedicated scope for the scoped services, disposed right after.
         await using var scope = services.CreateAsyncScope();
 
         await scope.ServiceProvider.GetRequiredService<FinanceDbContext>().Database.MigrateAsync(cancellationToken);
