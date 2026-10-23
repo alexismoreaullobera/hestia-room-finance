@@ -19,6 +19,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Internal helpers (month argument, text formats) are tested directly. -->
+    <InternalsVisibleTo Include="Hestia.Room.Finance.Mcp.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Hestia.Room.Finance.Infrastructure\Hestia.Room.Finance.Infrastructure.csproj" />
   </ItemGroup>
 

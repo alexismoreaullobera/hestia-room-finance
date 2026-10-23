@@ -26,6 +26,7 @@ builder.Services.AddMcpServer()
         options.SessionMode = HttpServerSessionMode.Stateless;
     })
     // Explicit registration: only the tools and views listed here are exposed.
+    .WithTools<FinanceDataTools>()
     .WithTools<FinanceViewTools>()
     .WithResources(FinanceViewResources.Create())
     .WithMcpApps();
