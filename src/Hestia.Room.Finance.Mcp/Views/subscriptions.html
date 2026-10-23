@@ -7,6 +7,15 @@
   <title>Abonnements</title>
   <style>
     /* @shared view.css */
+
+    /* As many columns as fit: the cards wrap in a narrow view instead of overflowing. */
+    .totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 12px; }
+    .totals .card { margin: 0; }
+    .totals .title { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    .totals .big { font-size: 20px; font-weight: 600; margin-top: 2px; }
+    /* The table scrolls on its own in a narrow view, the page does not. */
+    .table-wrap { overflow-x: auto; }
+    .detail { display: block; color: var(--muted); font-size: 12px; }
   </style>
 </head>
 <body>
@@ -21,11 +30,60 @@
   <script type="module">
     /* @shared view.js */
 
+    const frequencies = { Monthly: "mensuel", Quarterly: "trimestriel", Yearly: "annuel" };
+    const categories = {
+      Other: "Autre", Income: "Revenu", Housing: "Logement", Utilities: "Énergie", Telecom: "Télécom",
+      Insurance: "Assurance", Transport: "Transport", Health: "Santé", Food: "Alimentation", Leisure: "Loisirs",
+      Education: "Éducation", Savings: "Épargne", Taxes: "Impôts",
+    };
+
+    function total(title, value) {
+      return element("div", { className: "card" },
+        element("div", { className: "title", text: title }),
+        element("div", { className: "big", text: value }));
+    }
+
+    function subscriptionRow(subscription) {
+      return element("tr", {},
+        element("td", {},
+          document.createTextNode(subscription.name),
+          element("span", { className: "detail", text: categories[subscription.category] ?? subscription.category })),
+        element("td", { className: "amount" },
+          document.createTextNode(formatEuros(subscription.amount)),
+          element("span", { className: "detail", text: frequencies[subscription.frequency] ?? subscription.frequency })),
+        amount(subscription.monthlyEquivalent, "td"),
+        element("td", {
+          className: subscription.dueDate ? "" : "muted",
+          text: subscription.dueDate ? formatDay(subscription.dueDate) : "pas ce mois-ci",
+        }),
+        element("td", {
+          className: subscription.commitmentEndDate ? "" : "muted",
+          text: subscription.commitmentEndDate ? `jusqu'au ${formatDate(subscription.commitmentEndDate)}` : "sans",
+        }));
+    }
+
     await startView({
       name: "Subscriptions",
       tool: "show_subscriptions",
-      render: (data, content) => {
-        content.append(element("p", { className: "muted", text: "Vue en construction." }));
+      render: ({ subscriptions, monthlyTotal, yearlyTotal }, content) => {
+        if (subscriptions.length === 0) {
+          content.append(element("p", { className: "muted", text: "Aucun abonnement en cours ce mois-ci." }));
+          return;
+        }
+        content.append(
+          element("div", { className: "totals" },
+            total("Par mois", formatEuros(monthlyTotal)),
+            total("Par an", formatEuros(yearlyTotal)),
+            total("Abonnements", String(subscriptions.length))),
+          element("div", { className: "table-wrap" },
+            element("table", {},
+              element("thead", {}, element("tr", {},
+                element("th", { text: "Abonnement" }),
+                element("th", { className: "amount", text: "Montant" }),
+                element("th", { className: "amount", text: "Par mois" }),
+                element("th", { text: "Débit" }),
+                element("th", { text: "Engagement" }))),
+              element("tbody", {}, ...subscriptions.map(subscriptionRow)))));
       },
     });
   </script>
