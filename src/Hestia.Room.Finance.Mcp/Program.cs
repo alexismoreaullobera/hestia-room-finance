@@ -1,9 +1,23 @@
+using Hestia.Room.Finance.Infrastructure;
+using Hestia.Room.Finance.Mcp.Time;
 using Hestia.Room.Finance.Mcp.Tools;
 using Hestia.Room.Finance.Mcp.Views;
 using ModelContextProtocol.AspNetCore;
 using ModelContextProtocol.Extensions.Apps;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Locally from the .NET user secrets (see README), in production from the environment: never in a committed file.
+var connectionString = builder.Configuration.GetConnectionString("Finance");
+if (string.IsNullOrWhiteSpace(connectionString))
+{
+    throw new InvalidOperationException(
+        "The connection string ConnectionStrings:Finance is not set. Locally, set it in the .NET user secrets (see README).");
+}
+
+builder.Services.AddFinanceInfrastructure(connectionString);
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<FinanceClock>();
 
 builder.Services.AddMcpServer()
     .WithHttpTransport(options =>
@@ -30,8 +44,19 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseCors(DevHostsCorsPolicy);
+
+    // Development only: migrations and demo plan at startup. In production, the deployment pipeline migrates.
+    var currentMonth = app.Services.GetRequiredService<FinanceClock>().CurrentMonth();
+    if (await app.Services.PrepareDevelopmentDatabaseAsync(currentMonth))
+    {
+        app.Logger.LogInformation("Development database ready: demo plan seeded for {Month}.", currentMonth);
+    }
+    else
+    {
+        app.Logger.LogInformation("Development database ready: the existing plan is kept.");
+    }
 }
 
 app.MapMcp("/mcp");
 
-app.Run();
+await app.RunAsync();

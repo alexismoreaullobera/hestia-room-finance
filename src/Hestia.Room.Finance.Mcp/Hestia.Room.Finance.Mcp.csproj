@@ -9,11 +9,17 @@
     <NoWarn>$(NoWarn);MCPEXP003</NoWarn>
     <!-- packages.lock.json: exact versions and content hashes of all dependencies (direct and transitive). -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- Key of the local secrets store (outside the repository), read in Development: the connection string. -->
+    <UserSecretsId>hestia-room-finance-mcp</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.3.0" />
     <PackageReference Include="ModelContextProtocol.Extensions.Apps" Version="2.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Hestia.Room.Finance.Infrastructure\Hestia.Room.Finance.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

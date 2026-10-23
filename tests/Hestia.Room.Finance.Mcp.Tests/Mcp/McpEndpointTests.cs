@@ -10,14 +10,15 @@ namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 /// End-to-end tests of the /mcp endpoint (in-memory server, real HTTP pipeline).
 /// They lock the pitfalls found during the T1 spike (docs/spike-mcp-apps.md).
 /// </summary>
-public class McpEndpointTests(DevelopmentMcpServerFactory factory) : IClassFixture<DevelopmentMcpServerFactory>
+[Collection(McpServerCollection.Name)]
+public class McpEndpointTests(McpServerFixture mcp)
 {
     // Written as a literal on purpose (not FinanceViewResources.BalanceViewUri): this URI is a public
     // contract read by the hosts, so renaming it in the code must break these tests.
     private const string BalanceViewUri = "ui://finance/balance.html";
     private const int RequestId = 1;
 
-    private readonly HttpClient _client = factory.CreateClient();
+    private readonly HttpClient _client = mcp.Server.CreateClient();
 
     [Fact]
     public async Task ToolsList_ExposesShowBalanceLinkedToItsView()
