@@ -127,4 +127,4 @@ Bank connection, transaction-level tracking, several bank accounts, currencies o
 
 ## Open questions
 
-1. **The T1 spike.** `show_balance` and `FakeAccounts` are replaced by the v1 tools and a realistic demo data set (several months of plan and actuals). The demo plan and the four data tools are done (T5, T6); the spike widget goes when the v1 views replace it (T7).
+1. **The T1 spike.** Resolved: `show_balance` and `FakeAccounts` are replaced by the v1 tools and a realistic demo data set (several months of plan and actuals): demo plan (T5), data tools (T6), views (T7).
