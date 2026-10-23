@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Prévisionnel de trésorerie</title>
+  <style>
+    /* @shared view.css */
+  </style>
+</head>
+<body>
+  <h1 id="month">Prévisionnel de trésorerie</h1>
+  <p class="status" id="status">En attente des données…</p>
+
+  <script type="module">
+    /* @shared view.js */
+
+    await startView({
+      name: "Cash flow forecast",
+      render: (data) => {
+        document.getElementById("month").textContent = `Prévisionnel de trésorerie : ${data.month}`;
+      },
+    });
+  </script>
+</body>
+</html>

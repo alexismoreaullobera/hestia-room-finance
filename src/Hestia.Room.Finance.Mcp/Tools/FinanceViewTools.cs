@@ -1,7 +1,7 @@
 using System.ComponentModel;
-using System.Globalization;
-using System.Text.Json;
-using Hestia.Room.Finance.Mcp.Data;
+using Hestia.Room.Finance.Infrastructure;
+using Hestia.Room.Finance.Mcp.Time;
+using Hestia.Room.Finance.Mcp.Tools.Outputs;
 using Hestia.Room.Finance.Mcp.Views;
 using ModelContextProtocol.Extensions.Apps;
 using ModelContextProtocol.Protocol;
@@ -9,29 +9,48 @@ using ModelContextProtocol.Server;
 
 namespace Hestia.Room.Finance.Mcp.Tools;
 
+/// <summary>
+/// View tools: each one is its data tool plus a <c>ui://</c> view, which MCP Apps hosts render with the result.
+/// Same result (text summary, structured content, output schema), so the view and the agent see the same figures;
+/// a host without UI simply shows the text. Called by the agent to show a view, and by the views themselves to
+/// change month.
+/// </summary>
 [McpServerToolType]
-public class FinanceViewTools
+public sealed class FinanceViewTools
 {
-    private static readonly CultureInfo French = CultureInfo.GetCultureInfo("fr-FR");
-    private static readonly JsonSerializerOptions WidgetJson = new(JsonSerializerDefaults.Web);
+    [McpServerTool(Name = "show_month_overview", Title = "Vue : synthèse du mois", ReadOnly = true, Idempotent = true,
+        OpenWorld = false, UseStructuredContent = true, OutputSchemaType = typeof(MonthSummaryOutput))]
+    [Description("Shows the user the month overview: planned and actual incomes, recurring expenses, budgets and savings "
+        + "capacity. Same data as get_month_summary, displayed as a view.")]
+    [McpAppUi(ResourceUri = FinanceViewResources.MonthOverviewUri)]
+    public static Task<CallToolResult> ShowMonthOverview(
+        FinancePlanReader reader,
+        FinanceClock clock,
+        [Description(MonthArgument.Description)] string? month = null,
+        CancellationToken cancellationToken = default) =>
+        FinanceDataTools.GetMonthSummary(reader, clock, month, cancellationToken);
 
-    [McpServerTool(Name = "show_balance", ReadOnly = true)]
-    [Description("Shows the balance of each account and the total balance.")]
-    [McpAppUi(ResourceUri = FinanceViewResources.BalanceViewUri)]
-    public static CallToolResult ShowBalance()
-    {
-        var accounts = FakeAccounts.All;
-        var total = accounts.Sum(a => a.Balance);
-        var details = string.Join(", ", accounts.Select(a => $"{a.Name} : {a.Balance.ToString("C", French)}"));
+    [McpServerTool(Name = "show_cash_flow_forecast", Title = "Vue : prévisionnel de trésorerie", ReadOnly = true,
+        Idempotent = true, OpenWorld = false, UseStructuredContent = true, OutputSchemaType = typeof(CashFlowForecastOutput))]
+    [Description("Shows the user the day-by-day cash flow forecast as a chart: low point, cash buffer, alert and the "
+        + "debits that dig the low point. Same data as get_cash_flow_forecast, displayed as a view.")]
+    [McpAppUi(ResourceUri = FinanceViewResources.CashFlowForecastUri)]
+    public static Task<CallToolResult> ShowCashFlowForecast(
+        FinancePlanReader reader,
+        FinanceClock clock,
+        [Description(MonthArgument.Description)] string? month = null,
+        CancellationToken cancellationToken = default) =>
+        FinanceDataTools.GetCashFlowForecast(reader, clock, month, cancellationToken);
 
-        return new CallToolResult
-        {
-            // Self-sufficient text summary: used by the model and by hosts without UI (voice-only mode).
-            Content = [new TextContentBlock { Text = $"Solde total : {total.ToString("C", French)}. {details}." }],
-            // Structured data for the widget: no text parsing on the view side.
-            StructuredContent = JsonSerializer.SerializeToElement(new BalanceView(accounts, total), WidgetJson),
-        };
-    }
-
-    private sealed record BalanceView(IReadOnlyList<Account> Accounts, decimal Total);
+    [McpServerTool(Name = "show_subscriptions", Title = "Vue : abonnements", ReadOnly = true, Idempotent = true,
+        OpenWorld = false, UseStructuredContent = true, OutputSchemaType = typeof(SubscriptionsOutput))]
+    [Description("Shows the user the subscriptions with their monthly and yearly cost, debit dates and commitment ends. "
+        + "Same data as list_subscriptions, displayed as a view.")]
+    [McpAppUi(ResourceUri = FinanceViewResources.SubscriptionsUri)]
+    public static Task<CallToolResult> ShowSubscriptions(
+        FinancePlanReader reader,
+        FinanceClock clock,
+        [Description(MonthArgument.Description)] string? month = null,
+        CancellationToken cancellationToken = default) =>
+        FinanceDataTools.ListSubscriptions(reader, clock, month, cancellationToken);
 }

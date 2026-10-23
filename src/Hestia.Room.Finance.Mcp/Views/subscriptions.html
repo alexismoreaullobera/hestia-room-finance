@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Abonnements</title>
+  <style>
+    /* @shared view.css */
+  </style>
+</head>
+<body>
+  <h1 id="month">Abonnements</h1>
+  <p class="status" id="status">En attente des données…</p>
+
+  <script type="module">
+    /* @shared view.js */
+
+    await startView({
+      name: "Subscriptions",
+      render: (data) => {
+        document.getElementById("month").textContent = `Abonnements : ${data.month}`;
+      },
+    });
+  </script>
+</body>
+</html>

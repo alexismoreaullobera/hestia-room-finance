@@ -28,8 +28,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- MCP Apps views (ui:// resources) are embedded in the assembly and served by the MCP server. -->
+    <!-- MCP Apps views (ui:// resources) and the code they share are embedded in the assembly and served by the MCP server. -->
     <EmbeddedResource Include="Views\*.html" />
+    <EmbeddedResource Include="Views\shared\*.css;Views\shared\*.js" />
   </ItemGroup>
 
 </Project>
