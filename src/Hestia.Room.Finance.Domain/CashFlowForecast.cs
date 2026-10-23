@@ -125,15 +125,13 @@ public sealed class CashFlowForecast
         var baseShare = Math.Floor(amount * 100 / daysInMonth) / 100;
         var shares = Enumerable.Repeat(baseShare, daysInMonth).ToArray();
 
-        var remainder = amount - (baseShare * daysInMonth);
-        var extraCents = (int)Math.Floor(remainder * 100);
+        // Amounts are in cents (see Guard.ThrowIfNotCents): the remainder is a whole number of cents, below one per day.
+        var extraCents = (int)((amount - (baseShare * daysInMonth)) * 100);
         for (var i = 0; i < extraCents; i++)
         {
             shares[i] += 0.01m;
         }
 
-        // Only for an amount with more than two decimals: the part below the cent goes to the last day.
-        shares[^1] += remainder - (extraCents * 0.01m);
         return shares;
     }
 }

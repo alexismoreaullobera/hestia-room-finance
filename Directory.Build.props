@@ -1,0 +1,10 @@
+<Project>
+
+  <!-- Settings shared by every project of the repository (MSBuild imports this file automatically). -->
+  <PropertyGroup>
+    <!-- A dependency with a known vulnerability fails the build, locally and in CI, instead of a warning that can
+         go unnoticed (NU1901 to NU1904: low, moderate, high and critical severity). -->
+    <WarningsAsErrors>$(WarningsAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

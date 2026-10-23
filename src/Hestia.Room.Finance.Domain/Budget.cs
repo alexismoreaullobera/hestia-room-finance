@@ -5,8 +5,10 @@ public sealed class Budget
 {
     public Budget(Guid id, string name, decimal plannedAmount)
     {
+        Guard.ThrowIfEmpty(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(plannedAmount);
+        Guard.ThrowIfNotCents(plannedAmount);
 
         Id = id;
         Name = name;
