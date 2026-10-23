@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { cashFlowForecast, chart, MIN_WIDTH } from "../src/cash-flow-forecast";
 import { monthOverview } from "../src/month-overview";
-import type { CashFlowForecastOutput, MonthSummaryOutput, SubscriptionsOutput } from "../src/shared/outputs";
+import type { CashFlowForecastOutput, MonthSummaryOutput, SubscriptionOutput, SubscriptionsOutput } from "../src/shared/outputs";
 import { formatEuros } from "../src/shared/format";
 import { subscriptions } from "../src/subscriptions";
 import forecastFixture from "./fixtures/cash-flow-forecast.json";
@@ -23,6 +23,10 @@ beforeEach(() => {
 });
 
 const texts = (selector: string) => [...content.querySelectorAll(selector)].map(node => plain(node.textContent));
+/** Every row of the table body, every cell as the texts of its parts (a value and its detail, for instance). */
+const rows = () => [...content.querySelectorAll("tbody tr")]
+  .map(row => [...row.children].map(cell => [...cell.childNodes].map(part => plain(part.textContent))));
+const euros = (value: number) => plain(formatEuros(value));
 
 describe("view definitions", () => {
   it.each([
@@ -36,12 +40,33 @@ describe("view definitions", () => {
 });
 
 describe("month overview", () => {
-  it("shows the planned and actual savings capacity, then the figures side by side", () => {
-    monthOverview.render(demoMonth, content, 640);
+  // On the demo plan nothing is entered yet, so planned and actual are equal: different here, so that a column or a
+  // card showing the wrong reading fails.
+  const planned = demoMonth.planned;
+  const actual = {
+    ...planned, incomes: 2300, recurringExpenses: 1300.5, budgets: 480.25, savingsCapacity: 519.25,
+    smoothedSavingsCapacity: 600,
+  };
 
-    expect(texts(".card .big")).toEqual([
-      plain(formatEuros(demoMonth.planned.savingsCapacity)), plain(formatEuros(demoMonth.actual.savingsCapacity))]);
-    expect(texts("tbody tr td:first-child")).toEqual(["Entrées", "Dépenses récurrentes", "Budgets", "Capacité d'épargne"]);
+  it("shows the planned and actual savings capacity, as due this month and on an average month", () => {
+    monthOverview.render({ ...demoMonth, actual }, content, 640);
+
+    expect(texts(".card .title")).toEqual(["Capacité d'épargne prévue", "Capacité d'épargne réelle"]);
+    expect(texts(".card .big")).toEqual([euros(planned.savingsCapacity), euros(actual.savingsCapacity)]);
+    expect(texts(".card .detail")).toEqual([
+      `Sur un mois moyen : ${euros(planned.smoothedSavingsCapacity)}`, `Sur un mois moyen : ${euros(600)}`]);
+  });
+
+  it("shows the figures side by side, planned then actual", () => {
+    monthOverview.render({ ...demoMonth, actual }, content, 640);
+
+    expect(rows()).toEqual([
+      [["Entrées"], [euros(planned.incomes)], [euros(2300)]],
+      [["Dépenses récurrentes"], [euros(planned.recurringExpenses)], [euros(1300.5)]],
+      [["Budgets"], [euros(planned.budgets)], [euros(480.25)]],
+      [["Capacité d'épargne"], [euros(planned.savingsCapacity)], [euros(519.25)]],
+    ]);
+    expect(content.querySelector("tbody tr:last-child")?.className).toBe("total");
     expect(content.querySelector(".note")).not.toBeNull();
   });
 });
@@ -52,9 +77,12 @@ describe("cash flow forecast", () => {
 
     expect(demoForecast.hasAlert).toBe(true);
     expect(plain(content.querySelector(".alert")?.textContent)).toContain(`au moins ${plain(formatEuros(demoForecast.cashBuffer))}`);
-    expect(content.querySelectorAll(".card")).toHaveLength(3);
+    expect(texts(".card .big")).toEqual([
+      euros(demoForecast.startingBalance), euros(demoForecast.lowPoint.balance), euros(demoForecast.cashBuffer)]);
+    expect(texts(".card .detail")).toEqual(["au début du mois", "le 27/03", "pour ne jamais passer sous zéro"]);
     expect(content.querySelectorAll("svg.chart rect.day")).toHaveLength(demoForecast.days.length);
     expect(texts("tbody tr td:nth-child(2)")).toEqual(demoForecast.contributingDebits.map(d => d.name));
+    expect(rows()[0]).toEqual([["01/03"], ["Abonnement transports"], [euros(86.4)]]);
   });
 
   it("says the month starts overdrawn instead of a buffer of 0 €", () => {
@@ -86,9 +114,12 @@ describe("cash flow forecast", () => {
 
 describe("chart", () => {
   const day = (date: string, balance: number) => ({ date, balance });
-  const numbers = (node: SVGElement) => [...node.querySelectorAll("*")]
-    .flatMap(child => [...child.attributes].map(attribute => attribute.value))
-    .filter(value => /^-?[\d.]+$/.test(value));
+  const NUMERIC_ATTRIBUTES = ["x", "y", "x1", "x2", "y1", "y2", "cx", "cy", "r", "width", "height"];
+  /** Every coordinate and size of the drawing, the points of the curve and of the area included. */
+  const numbers = (node: SVGElement) => [...node.querySelectorAll("*")].flatMap(child => [
+    ...NUMERIC_ATTRIBUTES.flatMap(name => child.getAttribute(name) ?? []),
+    ...(child.getAttribute("points")?.split(/[ ,]/) ?? []),
+  ]).map(Number);
 
   it("is drawn at the given width, and never narrower than its minimum", () => {
     expect(chart(demoForecast.days, demoForecast.lowPoint, 1000).getAttribute("viewBox")).toBe("0 0 1000 240");
@@ -102,8 +133,18 @@ describe("chart", () => {
   ])("stays drawable with %s", (_, days) => {
     const node = chart(days, days[0]!, 640);
 
-    expect(numbers(node).every(value => Number.isFinite(Number(value)))).toBe(true);
-    expect(node.querySelector("polyline")?.getAttribute("points")).not.toContain("NaN");
+    // A NaN or an Infinity (a division by zero) would leave an attribute the browser ignores: a broken drawing.
+    expect(numbers(node).length).toBeGreaterThan(20);
+    expect(numbers(node).filter(value => !Number.isFinite(value))).toEqual([]);
+  });
+
+  it("dates the time axis every week and on the last day, anchored inside the frame", () => {
+    const dates = [...chart(demoForecast.days, demoForecast.lowPoint, 640).querySelectorAll("text.axis")]
+      .filter(text => /^\d\d\/\d\d$/.test(text.textContent));
+
+    // 31 days: the 29/03 would be too close to the 31/03, it is skipped.
+    expect(dates.map(text => text.textContent)).toEqual(["01/03", "08/03", "15/03", "22/03", "31/03"]);
+    expect(dates.map(text => text.getAttribute("text-anchor"))).toEqual(["start", "middle", "middle", "middle", "end"]);
   });
 
   it("marks the low point, and nothing when it is not one of the days", () => {
@@ -123,11 +164,23 @@ describe("subscriptions", () => {
     subscriptions.render(demoSubscriptions, content, 640);
 
     expect(texts(".card .big")).toEqual([
-      plain(formatEuros(demoSubscriptions.monthlyTotal)), plain(formatEuros(demoSubscriptions.yearlyTotal)),
+      euros(demoSubscriptions.monthlyTotal), euros(demoSubscriptions.yearlyTotal),
       String(demoSubscriptions.subscriptions.length)]);
-    expect(content.querySelectorAll("tbody tr")).toHaveLength(demoSubscriptions.subscriptions.length);
-    expect(texts("tbody tr td:nth-child(2) .detail")).toContain("mensuel");
-    expect(texts("tbody tr td:nth-child(5)")).toContain("sans");
+    expect(rows()).toHaveLength(demoSubscriptions.subscriptions.length);
+    expect(rows()[0]).toEqual([
+      ["Salle de sport", "Loisirs"], ["34,90 €", "mensuel"], ["34,90 €"], ["03/03"], ["jusqu'au 31/05/2027"]]);
+  });
+
+  it("shows a quarterly subscription with its monthly equivalent", () => {
+    const quarterly: SubscriptionOutput = {
+      id: "00000000-0000-0000-0000-000000000099", name: "Assurance habitation", amount: 45, frequency: "Quarterly",
+      category: "Insurance", monthlyEquivalent: 15, yearlyCost: 180, dueDate: null, commitmentEndDate: null,
+    };
+
+    subscriptions.render({ ...demoSubscriptions, subscriptions: [quarterly] }, content, 640);
+
+    expect(rows()).toEqual([
+      [["Assurance habitation", "Assurance"], ["45,00 €", "trimestriel"], ["15,00 €"], ["pas ce mois-ci"], ["sans"]]]);
   });
 
   it("says when there is no subscription", () => {

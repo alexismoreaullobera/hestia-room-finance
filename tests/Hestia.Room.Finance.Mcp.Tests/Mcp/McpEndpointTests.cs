@@ -37,11 +37,11 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
     /// <summary>
     /// Every view tool with a valid month, no month (the first display by the agent), and invalid months the view
-    /// could send (0000-12 is the month before 0001-01).
+    /// could send (0000-12 is the month before 0001-01, 10000-01 the month after 9999-12).
     /// </summary>
     public static TheoryData<string, string, string?> ViewToolsDataToolsAndMonths => new(
         from view in ViewTable
-        from month in new[] { DevelopmentMcpServerFactory.CurrentMonth.AddMonths(-1).ToString(), null, "2026-13", "0000-12" }
+        from month in new[] { DevelopmentMcpServerFactory.CurrentMonth.AddMonths(-1).ToString(), null, "2026-13", "0000-12", "10000-01" }
         select (view.ViewTool, view.DataTool, month));
 
     private readonly McpTestClient _mcp = new(mcp.Server.CreateClient());
@@ -159,14 +159,30 @@ public partial class McpEndpointTests(McpServerFixture mcp)
         Assert.DoesNotContain("<link", html, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void ViewsOutputs_DeclareEveryFrequencyAndCategory()
+    [Theory]
+    [MemberData(nameof(ViewToolsAndViews))]
+    public async Task AView_CallsOnlyItsOwnTool_AndHasEveryPageElement(string viewTool, string viewUri)
     {
-        // The TypeScript unions of outputs.ts follow the domain enums; the views translate every value of the
+        // A view wired to another tool would navigate into the wrong view; a page without one of the ids that
+        // startView requires would stay blank. The ids come from view.ts, the single list both sides read.
+        var html = (string)(await ReadViewAsync(viewUri))["text"]!;
+        var view = File.ReadAllText(Path.Combine(ViewFixturesTests.ViewsProjectDirectory(), "src", "shared", "view.ts"));
+        var pageIds = Quoted().Matches(PageIds().Match(view).Groups[1].Value).Select(m => m.Groups[1].Value).ToList();
+
+        Assert.Equal([viewTool], ViewToolName().Matches(html).Select(m => m.Value));
+        Assert.Equal(["label", "previous", "month", "next", "status", "content"], pageIds);
+        Assert.All(pageIds, id => Assert.Contains($"id=\"{id}\"", html));
+    }
+
+    [Fact]
+    public void ViewsOutputs_DeclareExactlyTheFrequenciesAndCategories()
+    {
+        // The TypeScript unions of outputs.ts equal the domain enums; the views translate every value of the
         // unions (a Record over them), so a new value of the domain cannot show up untranslated.
         var outputs = File.ReadAllText(Path.Combine(ViewFixturesTests.ViewsProjectDirectory(), "src", "shared", "outputs.ts"));
 
-        Assert.All(Enum.GetNames<Frequency>().Concat(Enum.GetNames<Category>()), name => Assert.Contains($"\"{name}\"", outputs));
+        Assert.Equal(Enum.GetNames<Frequency>().Order(), Union(outputs, "Frequency").Order());
+        Assert.Equal(Enum.GetNames<Category>().Order(), Union(outputs, "Category").Order());
     }
 
     [Fact]
@@ -187,6 +203,23 @@ public partial class McpEndpointTests(McpServerFixture mcp)
     // A src or href attribute pointing to another origin (any scheme, or protocol relative).
     [GeneratedRegex(@"\b(?:src|href)\s*=\s*[""']?(?:[a-z][a-z0-9+.-]*:)?//", RegexOptions.IgnoreCase)]
     private static partial Regex ExternalLoad();
+
+    [GeneratedRegex(@"\bshow_[a-z_]+\b")]
+    private static partial Regex ViewToolName();
+
+    [GeneratedRegex(@"PAGE_IDS = \[([^\]]+)\]")]
+    private static partial Regex PageIds();
+
+    [GeneratedRegex(@"""(\w+)""")]
+    private static partial Regex Quoted();
+
+    /// <summary>The values of a union of string literals in outputs.ts (export type Name = "A" | "B";).</summary>
+    private static IEnumerable<string> Union(string outputs, string name)
+    {
+        var union = Regex.Match(outputs, $@"export type {name} =([^;]+);");
+        Assert.True(union.Success, $"outputs.ts declares no union {name}.");
+        return Quoted().Matches(union.Groups[1].Value).Select(m => m.Groups[1].Value);
+    }
 
     private async Task<JsonNode> ToolAsync(string name) =>
         (await _mcp.SendAsync("tools/list"))["tools"]!.AsArray().Single(t => (string?)t!["name"] == name)!;
