@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using Hestia.Room.Finance.Domain;
 using Hestia.Room.Finance.Infrastructure;
 using Hestia.Room.Finance.Mcp.Time;
 using Hestia.Room.Finance.Mcp.Tools.Outputs;
@@ -37,13 +38,18 @@ public sealed class FinanceDataTools
         OpenWorld = false, UseStructuredContent = true, OutputSchemaType = typeof(CashFlowForecastOutput))]
     [Description("Day-by-day cash flow forecast of a month from the starting balance: low point, cash buffer, alert when "
         + "the balance goes below zero, and the recurring expenses that dig the low point.")]
-    public static async Task<CallToolResult> GetCashFlowForecast(
+    public static Task<CallToolResult> GetCashFlowForecast(
         FinancePlanReader reader,
         FinanceClock clock,
         [Description(MonthArgument.Description)] string? month = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        CashFlowForecastAsync(reader, MonthArgument.Resolve(month, clock), cancellationToken);
+
+    /// <summary>The result of get_cash_flow_forecast for a month already resolved: also what an input tool returns.</summary>
+    internal static async Task<CallToolResult> CashFlowForecastAsync(
+        FinancePlanReader reader, YearMonth month, CancellationToken cancellationToken)
     {
-        var financeMonth = await reader.LoadMonthAsync(MonthArgument.Resolve(month, clock), cancellationToken);
+        var financeMonth = await reader.LoadMonthAsync(month, cancellationToken);
         var output = CashFlowForecastOutput.From(financeMonth.Forecast());
         return Result(output, output.Describe());
     }

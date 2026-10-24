@@ -36,7 +36,12 @@ internal static class MonthArgument
 
         // The message goes back into the model context: a short value is echoed to help it fix its call, never a long one.
         // Null when a client sends "month": null, whatever the declared type.
-        var shown = month is null ? "(none)" : month.Length <= MaxEchoedLength ? $"'{month}'" : "(too long to show)";
+        var shown = month switch
+        {
+            null => "(none)",
+            { Length: <= MaxEchoedLength } => $"'{month}'",
+            _ => "(too long to show)",
+        };
         throw new McpException($"Invalid month {shown}: expected YYYY-MM, for instance 2026-04.");
     }
 }

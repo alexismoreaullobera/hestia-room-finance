@@ -1,8 +1,11 @@
 import type { CashFlowForecastOutput, DailyBalanceOutput, DebitOutput } from "./shared/outputs";
-import { amount, card, element, svg } from "./shared/dom";
+import { amount, card, cardContent, element, svg } from "./shared/dom";
 import { formatAmount, formatDay, formatEuros, formatMonth, parseEuros } from "./shared/format";
 import type { ViewContext, ViewDefinition } from "./shared/view";
 import "./cash-flow-forecast.css";
+
+/** The input tool of the starting balance, written as a literal: a contract with the server (tested on both sides). */
+export const SET_STARTING_BALANCE = "set_starting_balance";
 
 // Margins of the drawing area, in pixels: the chart is drawn at the width of the view (one viewBox unit per
 // pixel), so its texts keep their size on a wide screen instead of growing with it.
@@ -112,20 +115,16 @@ function debits(contributingDebits: DebitOutput[]): HTMLElement[] {
 function startingBalanceCard({ month, startingBalance }: CashFlowForecastOutput, call: ViewContext["call"]): HTMLElement {
   const node = element("div", { className: "card starting-balance" });
 
-  function read(focus = false): void {
+  function showValue(focus = false): void {
     const edit = element("button", { className: "edit", attributes: { type: "button" } }, "Modifier");
-    edit.addEventListener("click", () => { write(); });
+    edit.addEventListener("click", () => { showForm(); });
     node.classList.remove("editing");
-    node.replaceChildren(
-      element("div", { className: "title", text: "Solde de départ" }),
-      element("div", { className: "big" }, amount(startingBalance)),
-      element("div", { className: "detail", text: "au début du mois" }),
-      edit);
+    node.replaceChildren(...cardContent("Solde de départ", amount(startingBalance), "au début du mois"), edit);
     // Back to the button after a cancel, so that the keyboard focus is not lost.
     if (focus) edit.focus();
   }
 
-  function write(): void {
+  function showForm(): void {
     // The month in the accessible name: a screen reader says which month is changed.
     const field = element("input", {
       attributes: { type: "text", inputmode: "decimal", autocomplete: "off", "aria-label": `Solde de départ de ${formatMonth(month)}` },
@@ -134,6 +133,7 @@ function startingBalanceCard({ month, startingBalance }: CashFlowForecastOutput,
     const save = element("button", { attributes: { type: "submit" } }, "Enregistrer");
     const cancel = element("button", { attributes: { type: "button" } }, "Annuler");
     const problem = element("div", { className: "field-error", attributes: { role: "alert" } });
+    const setBusy = (busy: boolean) => { for (const control of [field, save, cancel]) control.disabled = busy; };
     const form = element("form", {},
       element("div", { className: "title", text: "Solde de départ" }),
       field,
@@ -150,18 +150,21 @@ function startingBalanceCard({ month, startingBalance }: CashFlowForecastOutput,
         return;
       }
       problem.textContent = "";
-      for (const control of [field, save, cancel]) control.disabled = true;
-      void call(SET_STARTING_BALANCE, { month, startingBalance: value }).then((saved) => {
-        // Saved: the view is redrawn from the result, this form is gone. Otherwise it is enabled again as typed.
-        if (!saved) {
-          for (const control of [field, save, cancel]) control.disabled = false;
-          field.focus();
+      setBusy(true);
+      void call(SET_STARTING_BALANCE, { month, startingBalance: value }).then((shown) => {
+        if (shown) {
+          // The view was redrawn from the result, this form with it: the focus goes to the new card's button.
+          document.querySelector<HTMLButtonElement>(".starting-balance .edit")?.focus();
+          return;
         }
+        // Not shown (refused, failed, or overtaken by a newer result): enabled again as typed.
+        setBusy(false);
+        field.focus();
       });
     });
-    cancel.addEventListener("click", () => { read(true); });
+    cancel.addEventListener("click", () => { showValue(true); });
     form.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") read(true);
+      if (event.key === "Escape") showValue(true);
     });
 
     node.classList.add("editing");
@@ -170,12 +173,9 @@ function startingBalanceCard({ month, startingBalance }: CashFlowForecastOutput,
     field.select();
   }
 
-  read();
+  showValue();
   return node;
 }
-
-/** The input tool of the starting balance, written as a literal: a contract with the server (tested on both sides). */
-export const SET_STARTING_BALANCE = "set_starting_balance";
 
 export const cashFlowForecast: ViewDefinition<CashFlowForecastOutput> = {
   name: "Prévisionnel de trésorerie",

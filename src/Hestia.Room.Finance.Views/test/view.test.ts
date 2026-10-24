@@ -97,10 +97,10 @@ describe("element and svg", () => {
   });
 
   it("accepts the kind of a form field, never its value as an attribute", () => {
-    const field = element("input", { attributes: { type: "text", inputmode: "decimal", autocomplete: "off", "aria-invalid": "true" } });
+    const field = element("input", { attributes: { type: "text", inputmode: "decimal", autocomplete: "off" } });
 
     expect(field.getAttribute("inputmode")).toBe("decimal");
-    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("autocomplete")).toBe("off");
     // value, name and form: set through properties when needed, never through the allowlist.
     for (const name of ["value", "name", "form", "formmethod", "action"]) {
       expect(() => element("input", { attributes: { [name]: "x" } })).toThrow(/not allowed/);

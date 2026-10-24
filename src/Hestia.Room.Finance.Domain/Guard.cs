@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace Hestia.Room.Finance.Domain;
@@ -34,7 +35,9 @@ internal static class Guard
     {
         if (Math.Abs(amount) > AmountLimit.Max)
         {
-            throw new ArgumentOutOfRangeException(paramName, amount, $"An amount in euros is at most {AmountLimit.Max} either way.");
+            // Invariant: the same message whatever the culture, in the logs too (a row read back goes through here).
+            throw new ArgumentOutOfRangeException(paramName, amount,
+                string.Create(CultureInfo.InvariantCulture, $"An amount in euros is at most {AmountLimit.Max} either way."));
         }
     }
 }

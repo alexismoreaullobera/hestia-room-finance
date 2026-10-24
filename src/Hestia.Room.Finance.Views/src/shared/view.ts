@@ -24,10 +24,11 @@ export interface ViewContext {
   /** The width of the content, to draw at the real size. */
   width: number;
   /**
-   * Calls an input tool, whose result (the view data recalculated by the server) is rendered like any other. Same
-   * guard as the month navigation: the buttons are disabled meanwhile, and an answer arriving after a newer result is
-   * ignored. True once the result is shown; false otherwise (refused, failed, outdated, or another call pending), the
-   * status then saying why when it is the answer of the call.
+   * Calls an input tool, whose result is rendered like any other: an input tool returns the data of the view that
+   * calls it (the output schema of its view tool), recalculated by the server. Same guard as the month navigation:
+   * the buttons are disabled meanwhile, and an answer arriving after a newer one is ignored. True once the result is
+   * shown; false when it is not (refused, failed, overtaken by a newer result, or another call pending), the status
+   * then saying why when it is the answer of the call.
    */
   call: (tool: string, args: Readonly<Record<string, unknown>>) => Promise<boolean>;
 }
@@ -67,7 +68,7 @@ export async function startView<T extends { month: string }>(
   let shown: string | null = null;
   let lastData: T | null = null;
   let renderedWidth = 0;
-  // Every result shown takes a new number: a navigation answer that arrives after a newer result is ignored.
+  // Every request and every result of the agent takes a new number: an answer that arrives after a newer one is ignored.
   let lastRequest = 0;
   let loading = false;
 
@@ -91,7 +92,7 @@ export async function startView<T extends { month: string }>(
   }
 
   /** Renders a result; true if it was, false if it was an error (the status then says unavailable). */
-  function show(result: ToolResult, unavailable = "Données indisponibles pour ce mois."): boolean {
+  function show(result: ToolResult, unavailable: string): boolean {
     if (result.isError || !result.structuredContent) {
       setStatus(unavailable, true);
       return false;
@@ -107,9 +108,10 @@ export async function startView<T extends { month: string }>(
   }
 
   // Drawn again when the width changes (window resized, browser zoom): only the width, since a new rendering
-  // changes the height, which would otherwise trigger another rendering.
+  // changes the height, which would otherwise trigger another rendering. Never while a form is open: a rendering
+  // rebuilds the content and would close it, losing what was typed; the next change of width redraws.
   new ResizeObserver(() => {
-    if (lastData !== null && content.clientWidth !== renderedWidth) {
+    if (lastData !== null && content.clientWidth !== renderedWidth && content.querySelector("form") === null) {
       render(lastData);
     }
   }).observe(content);
@@ -171,7 +173,7 @@ export async function startView<T extends { month: string }>(
   app.addEventListener("toolresult", (result) => {
     lastRequest++;
     loading = false;
-    show(result);
+    show(result, navigation.refused);
     setNavigation();
   });
   app.addEventListener("hostcontextchanged", applyHostTheme);

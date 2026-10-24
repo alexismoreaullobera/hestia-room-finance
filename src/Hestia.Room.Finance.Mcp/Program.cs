@@ -46,6 +46,23 @@ var app = builder.Build();
 // Created now in every environment: a missing time zone stops the startup instead of failing the first tool call.
 var clock = app.Services.GetRequiredService<FinanceClock>();
 
+// Origin check (required by the MCP Streamable HTTP transport): a request sent by a web page carries the Origin of that
+// page, and only the allowed host origins may call the server, so that no other site can make a browser read or write
+// the plan (DNS rebinding, cross-site requests). Hosts that are not web pages (the Inspector proxy, desktop clients)
+// send no Origin and are not concerned. In every environment: outside Development, no origin is allowed for now.
+var allowedOrigins = new HashSet<string>(devHostOrigins, StringComparer.OrdinalIgnoreCase);
+app.Use(async (context, next) =>
+{
+    var origin = context.Request.Headers.Origin.ToString();
+    if (origin.Length > 0 && !allowedOrigins.Contains(origin))
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return;
+    }
+
+    await next(context);
+});
+
 if (app.Environment.IsDevelopment())
 {
     app.UseCors(DevHostsCorsPolicy);

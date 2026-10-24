@@ -7,7 +7,7 @@ import { formatEuros } from "./format";
 // user can ever become code or a link. clip-path takes a url(), only a local url(#id) written by the code (never
 // data). The value of a field is set through its value property, never as an attribute.
 const SAFE_ATTRIBUTES: ReadonlySet<string> = new Set([
-  "role", "aria-label", "aria-invalid", "id", "class", "viewBox", "x", "y", "x1", "x2", "y1", "y2", "cx", "cy", "r",
+  "role", "aria-label", "id", "class", "viewBox", "x", "y", "x1", "x2", "y1", "y2", "cx", "cy", "r",
   "width", "height", "points", "text-anchor", "clip-path", "type", "inputmode", "autocomplete",
 ]);
 
@@ -27,10 +27,17 @@ export interface ElementOptions {
 }
 
 /**
+ * The tags a view may create: never one that runs or loads something (a script, a style, a frame, an embedded object,
+ * a base URL, a link or a meta tag), so that no text given to the kit can become code, style or a navigation.
+ */
+export type SafeTag = Exclude<keyof HTMLElementTagNameMap,
+  "script" | "style" | "iframe" | "frame" | "frameset" | "object" | "embed" | "base" | "link" | "meta">;
+
+/**
  * Creates an element. Text is set with textContent only (strings among the children become text nodes), never as
  * HTML: the data comes from tools and is untrusted (XSS, prompt injection through a name typed by the user).
  */
-export function element<K extends keyof HTMLElementTagNameMap>(
+export function element<K extends SafeTag>(
   tag: K, { className, text, attributes }: ElementOptions = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -54,10 +61,16 @@ export function amount(value: number, tag: "span" | "td" = "span"): HTMLElement 
   return element(tag, { className: value < 0 ? "amount negative" : "amount", text: formatEuros(value) });
 }
 
-/** A key figure: its title, its value (a node or a text) and an optional detail. Laid out by .cards. */
-export function card(title: string, value: Node | string, detail?: Node | string): HTMLElement {
-  return element("div", { className: "card" },
+/** The content of a card: its title, its value (a node or a text) and an optional detail. */
+export function cardContent(title: string, value: Node | string, detail?: Node | string): HTMLElement[] {
+  return [
     element("div", { className: "title", text: title }),
     element("div", { className: "big" }, value),
-    ...(detail === undefined ? [] : [element("div", { className: "detail" }, detail)]));
+    ...(detail === undefined ? [] : [element("div", { className: "detail" }, detail)]),
+  ];
+}
+
+/** A key figure: its title, its value (a node or a text) and an optional detail. Laid out by .cards. */
+export function card(title: string, value: Node | string, detail?: Node | string): HTMLElement {
+  return element("div", { className: "card" }, ...cardContent(title, value, detail));
 }

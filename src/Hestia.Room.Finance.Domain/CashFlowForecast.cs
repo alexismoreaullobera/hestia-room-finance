@@ -79,7 +79,7 @@ public sealed class CashFlowForecast
         var lowPoint = days.MinBy(d => d.Balance)!;
         var needsBuffer = startingBalance - lowPoint.Balance > 0m;
         IReadOnlyList<Occurrence> contributingDebits = needsBuffer
-            ? DrawdownExpenses(occurrences, days, startingBalance, month, lowPoint)
+            ? DrawdownExpenses(occurrences, days, startingBalance, lowPoint)
             : [];
 
         return new CashFlowForecast(month, startingBalance, occurrences, days.AsReadOnly(), lowPoint, contributingDebits);
@@ -94,10 +94,11 @@ public sealed class CashFlowForecast
         IReadOnlyList<Occurrence> occurrences,
         IReadOnlyList<DailyBalance> days,
         decimal startingBalance,
-        YearMonth month,
         DailyBalance lowPoint)
     {
-        var peakDate = month.FirstDay.AddDays(-1);
+        // Null while the peak is the starting balance, before the first day: not the day before the month, which does
+        // not exist for January of the year 1.
+        DateOnly? peakDate = null;
         var peakBalance = startingBalance;
         foreach (var day in days.TakeWhile(day => day.Date < lowPoint.Date))
         {
@@ -109,7 +110,7 @@ public sealed class CashFlowForecast
         }
 
         return occurrences
-            .Where(o => o.Line.Kind == FlowKind.Expense && o.Date > peakDate && o.Date <= lowPoint.Date)
+            .Where(o => o.Line.Kind == FlowKind.Expense && (peakDate is null || o.Date > peakDate) && o.Date <= lowPoint.Date)
             .ToList()
             .AsReadOnly();
     }

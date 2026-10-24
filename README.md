@@ -42,13 +42,13 @@ Each tool takes an optional `month` (`YYYY-MM`, the current month in Paris time 
 
 The views follow the host theme (light or dark), change month with their own tool (previous and next buttons, through `callServerTool`, without going through the agent), and never write HTML from data (text only, attributes through an allowlist). The cash flow forecast view edits the starting balance in place: the forecast is redrawn from the answer of the server.
 
-**Input tools**: the writes of the user, called by the views, never offered to the model (the agent has no write access in the v1).
+**Input tools**: the writes of the user, called by the views (the agent has no write access in the v1).
 
 | Input tool | Called by | What it does |
 |---|---|---|
 | `set_starting_balance` | Cash flow forecast view | Saves the starting balance of a month (negative if the account is already overdrawn), then returns the forecast recalculated, exactly as `get_cash_flow_forecast` |
 
-An input tool is declared with the MCP Apps visibility `app`: hosts hide it from the model and let the views call it. Its month is required (a write never falls back on the current month), and a value breaking a rule of the domain (cents, at most 999 999 999,99 € either way) is a tool error, with nothing written.
+An input tool is declared with the MCP Apps visibility `app`: an MCP Apps host hides it from the model and lets the views call it. A host without MCP Apps support ignores that metadata and offers it to its model like any other tool, so its description also reserves it for the view. Its month is required (a write never falls back on the current month), and a value breaking a rule of the domain (cents, at most 999 999 999,99 € either way) is a tool error, with nothing written.
 
 **Views project** (`Hestia.Room.Finance.Views`): TypeScript built with Vite and `vite-plugin-singlefile` into one self-contained HTML per view, the MCP Apps SDK (`@modelcontextprotocol/ext-apps`) included: no CDN, no third-party code loaded at runtime, and a CSP that declares no domain (no network access from a view; the requests to the host, such as opening a link, remain governed by the host). `dotnet build` builds the views and embeds them in the MCP server.
 
@@ -138,8 +138,8 @@ npm test
 ```
 
 - **Domain**: every calculation rule of the [scope](docs/scope.md), with business-named tests; sensitive rules checked by mutation.
-- **Infrastructure**: domain ↔ row conversions and the schema checked offline from the EF Core model; then, on a real SQL Server (Testcontainers, one fresh migrated database per test): migrations, round trip of every entity, constraints, cascades, the month reader, the writer (create, replace in the same row, other months untouched) and the demo seeder.
-- **MCP server**: unit tests of the tool outputs and text summaries on plans built in memory, of the month argument and of the clock (month change in Paris time); then end-to-end tests on the `/mcp` endpoint with an in-memory server, a real SQL Server and a fixed clock: the four data tools (annotations, output schema, figures equal to the domain applied to the demo plan, tool errors), the three view tools (their `ui://` link, a result equal to their data tool, valid and invalid months), the input tool (visibility `app`, hints, a result equal to the data tool after the save, invalid calls with nothing written), only the input tools hidden from the model and only they writing, the views (MIME type, self-contained: nothing loaded from outside, a CSP with no domain; each one mentions exactly its own tools), and host filtering.
+- **Infrastructure**: domain ↔ row conversions and the schema checked offline from the EF Core model; then, on a real SQL Server (Testcontainers, one fresh migrated database per test): migrations, round trip of every entity, constraints, cascades, the month reader, the writer (create, replace in the same row, other months untouched, two first saves at once) and the demo seeder.
+- **MCP server**: unit tests of the tool outputs and text summaries on plans built in memory, of the month argument and of the clock (month change in Paris time); then end-to-end tests on the `/mcp` endpoint with an in-memory server, a real SQL Server and a fixed clock: the four data tools (annotations, output schema, figures equal to the domain applied to the demo plan, tool errors), the three view tools (their `ui://` link, a result equal to their data tool, valid and invalid months), the input tool (visibility `app`, hints, a result equal to the data tool after the save, invalid calls with nothing written), only the input tools hidden from the model and only they writing, requests from a foreign `Origin` refused, the views (MIME type, self-contained: nothing loaded from outside, a CSP with no domain; each one mentions exactly its own tools), and host filtering.
 - **Views** (Vitest with happy-dom, the SDK replaced by a fake one): formats, amounts typed in French and month navigation, `startView` (loading, tool errors, failed calls and connection, host theme, re-render on a width change only, input calls with the same guard as the navigation), the starting balance form (sent arguments, refused input, form kept open on a refusal, cancel), text never written as markup and attributes outside the allowlist refused, the chart edge cases, and the three views rendered on JSON fixtures that a C# test keeps equal to the structured content of the tools. ESLint (with `eslint-plugin-no-unsanitized`) forbids every way of turning a string into markup or code.
 
 Tests use xUnit v3 on the Microsoft Testing Platform (declared in `global.json`).
@@ -184,7 +184,7 @@ Every change goes through a pull request: `main` is protected, and the CI (build
 
 ## Security
 
-This is a local development build: the MCP endpoint has **no authentication yet** and must not be exposed as is. The input tools are hidden from the model by the hosts (visibility `app`), but **this is not access control**: any MCP client reaching the endpoint can call them. Every value still goes through the rules of the domain before being saved. The hardening planned before any deployment is tracked in [#2](https://github.com/alexismoreaullobera/hestia-room-finance/issues/2).
+This is a local development build: the MCP endpoint has **no authentication yet** and must not be exposed as is. The input tools are hidden from the model by the MCP Apps hosts only (visibility `app`; a host without MCP Apps support offers them to its model), and **this is not access control**: any MCP client reaching the endpoint can call them. Every value still goes through the rules of the domain before being saved, and a request sent by a web page is refused unless its `Origin` is an allowed host origin (Development: `Cors:DevMcpHostOrigins`). The hardening planned before any deployment is tracked in [#2](https://github.com/alexismoreaullobera/hestia-room-finance/issues/2).
 
 Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md).
 
