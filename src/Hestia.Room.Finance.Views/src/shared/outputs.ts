@@ -12,11 +12,39 @@ export interface SummaryFigures {
   smoothedSavingsCapacity: number;
 }
 
+/** A budget of the month: actual is the planned amount when nothing was entered (entered: false). */
+export interface BudgetActualOutput {
+  id: string;
+  name: string;
+  planned: number;
+  actual: number;
+  entered: boolean;
+}
+
+export type FlowKind = "Income" | "Expense";
+
+export type LineActualStatus = "AsPlanned" | "Corrected" | "Skipped";
+
+/** A recurring line due this month: actual is the planned amount, the corrected one, or 0 when skipped. */
+export interface LineActualOutput {
+  id: string;
+  name: string;
+  kind: FlowKind;
+  date: string;
+  planned: number;
+  actual: number;
+  status: LineActualStatus;
+}
+
 /** show_month_overview (and get_month_summary). */
 export interface MonthSummaryOutput {
   month: string;
   planned: SummaryFigures;
   actual: SummaryFigures;
+  /** By name. */
+  budgets: BudgetActualOutput[];
+  /** The lines due this month, by date. */
+  lines: LineActualOutput[];
 }
 
 export interface DailyBalanceOutput {

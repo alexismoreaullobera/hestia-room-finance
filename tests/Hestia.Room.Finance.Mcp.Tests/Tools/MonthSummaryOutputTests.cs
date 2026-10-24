@@ -64,6 +64,77 @@ public class MonthSummaryOutputTests
     }
 
     [Fact]
+    public void Budgets_AreListedByName_WithTheActualWhenEntered()
+    {
+        var outings = new Budget(Guid.CreateVersion7(), "Sorties", 120.5m);
+        // Given out of order, as a database read without ORDER BY would.
+        var output = MonthSummaryOutput.From(April2026(0m, [], [outings, Groceries], [new BudgetActual(Groceries.Id, April, 280m)]));
+
+        Assert.Equal(
+            [
+                new BudgetActualOutput(Groceries.Id, "Courses", 300m, 280m, Entered: true),
+                // Without an actual: spent as planned.
+                new BudgetActualOutput(outings.Id, "Sorties", 120.5m, 120.5m, Entered: false),
+            ],
+            output.Budgets);
+    }
+
+    [Fact]
+    public void Budgets_WithAnActualOfZero_AreEntered()
+    {
+        // Nothing spent: 0 €, which is not "as planned".
+        var output = MonthSummaryOutput.From(April2026(0m, [], [Groceries], [new BudgetActual(Groceries.Id, April, 0m)]));
+
+        Assert.Equal(new BudgetActualOutput(Groceries.Id, "Courses", 300m, 0m, Entered: true), Assert.Single(output.Budgets));
+    }
+
+    [Fact]
+    public void Lines_AreTheLinesDueThisMonth_ByDate_WithWhatHappened()
+    {
+        var salary = Monthly(FlowKind.Income, "Salaire", 2000m, day: 28);
+        var rent = Monthly(FlowKind.Expense, "Loyer", 650m, day: 5);
+        var water = Monthly(FlowKind.Expense, "Eau", 45m, day: 12);
+        var bonus = Quarterly("Prime", 300m, day: 30, anchorMonth: 5, kind: FlowKind.Income); // not due in April
+
+        var output = MonthSummaryOutput.From(April2026(0m, [salary, rent, water, bonus],
+            overrides: [RecurringOverride.WithAmount(water.Id, April, 52.4m), RecurringOverride.Skipped(rent.Id, April)]));
+
+        Assert.Equal(
+            [
+                new LineActualOutput(rent.Id, "Loyer", FlowKind.Expense, new DateOnly(2026, 4, 5), 650m, 0m, LineActualStatus.Skipped),
+                new LineActualOutput(water.Id, "Eau", FlowKind.Expense, new DateOnly(2026, 4, 12), 45m, 52.4m, LineActualStatus.Corrected),
+                new LineActualOutput(salary.Id, "Salaire", FlowKind.Income, new DateOnly(2026, 4, 28), 2000m, 2000m, LineActualStatus.AsPlanned),
+            ],
+            output.Lines);
+        // The same figures as the actual summary: 2 000 € in, 52.40 € out.
+        Assert.Equal(52.4m, output.Actual.RecurringExpenses);
+    }
+
+    [Fact]
+    public void Describe_NamesTheActualsEntered()
+    {
+        var water = Monthly(FlowKind.Expense, "Eau", 45m, day: 12);
+        var rent = Monthly(FlowKind.Expense, "Loyer", 650m, day: 5);
+        var output = MonthSummaryOutput.From(April2026(0m, [water, rent], [Groceries],
+            [new BudgetActual(Groceries.Id, April, 280m)],
+            [RecurringOverride.WithAmount(water.Id, April, 52m), RecurringOverride.Skipped(rent.Id, April)]));
+
+        var text = output.Describe();
+
+        Assert.Contains($"Réels saisis : Courses {280m.ToString("C", French)} pour {300m.ToString("C", French)} prévus", text);
+        Assert.Contains($"Eau {52m.ToString("C", French)} pour {45m.ToString("C", French)} prévus", text);
+        Assert.Contains("Loyer : n'a pas eu lieu", text);
+    }
+
+    [Fact]
+    public void Describe_WithoutActuals_SaysEverythingIsAsPlanned()
+    {
+        var output = MonthSummaryOutput.From(April2026(0m, [Monthly(FlowKind.Expense, "Loyer", 650m, day: 5)], [Groceries]));
+
+        Assert.EndsWith("Aucun réel saisi : tout est compté comme prévu.", output.Describe());
+    }
+
+    [Fact]
     public void Describe_IsASelfSufficientSummaryInFrench()
     {
         var text = Output.Describe();

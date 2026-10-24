@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Hestia.Room.Finance.Domain;
+using Hestia.Room.Finance.Mcp.Tools.Outputs;
 using Hestia.Room.Finance.Mcp.Views;
 
 namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
@@ -200,7 +201,7 @@ public partial class McpEndpointTests(McpServerFixture mcp)
     }
 
     [Fact]
-    public void ViewsOutputs_DeclareExactlyTheFrequenciesAndCategories()
+    public void ViewsOutputs_DeclareExactlyTheEnumsOfTheOutputs()
     {
         // The TypeScript unions of outputs.ts equal the domain enums; the views translate every value of the
         // unions (a Record over them), so a new value of the domain cannot show up untranslated.
@@ -208,6 +209,8 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
         Assert.Equal(Enum.GetNames<Frequency>().Order(), Union(outputs, "Frequency").Order());
         Assert.Equal(Enum.GetNames<Category>().Order(), Union(outputs, "Category").Order());
+        Assert.Equal(Enum.GetNames<FlowKind>().Order(), Union(outputs, "FlowKind").Order());
+        Assert.Equal(Enum.GetNames<LineActualStatus>().Order(), Union(outputs, "LineActualStatus").Order());
     }
 
     [Fact]

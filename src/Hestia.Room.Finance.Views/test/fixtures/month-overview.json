@@ -17,5 +17,120 @@
     "smoothedIncomes": 2250.00,
     "smoothedRecurringExpenses": 1185.77,
     "smoothedSavingsCapacity": 534.23
-  }
+  },
+  "budgets": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "name": "Carburant",
+      "planned": 90.00,
+      "actual": 90.00,
+      "entered": false
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "name": "Courses",
+      "planned": 320.00,
+      "actual": 320.00,
+      "entered": false
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "name": "Sorties",
+      "planned": 120.00,
+      "actual": 120.00,
+      "entered": false
+    }
+  ],
+  "lines": [
+    {
+      "id": "00000000-0000-0000-0000-000000000004",
+      "name": "Abonnement transports",
+      "kind": "Expense",
+      "date": "2027-03-01",
+      "planned": 86.40,
+      "actual": 86.40,
+      "status": "AsPlanned"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000005",
+      "name": "Salle de sport",
+      "kind": "Expense",
+      "date": "2027-03-03",
+      "planned": 34.90,
+      "actual": 34.90,
+      "status": "AsPlanned"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000006",
+      "name": "Loyer",
+      "kind": "Expense",
+      "date": "2027-03-05",
+      "planned": 720.00,
+      "actual": 720.00,
+      "status": "AsPlanned"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000007",
+      "name": "Box internet",
+      "kind": "Expense",
+      "date": "2027-03-08",
+      "planned": 29.99,
+      "actual": 29.99,
+      "status": "AsPlanned"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000008",
+      "name": "Forfait mobile",
+      "kind": "Expense",
+      "date": "2027-03-08",
+      "planned": 12.99,
+      "actual": 12.99,
+      "status": "AsPlanned"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000009",
+      "name": "Électricité",
+      "kind": "Expense",
+      "date": "2027-03-12",
+      "planned": 68.00,
+      "actual": 68.00,
+      "status": "AsPlanned"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000010",
+      "name": "Assurance auto",
+      "kind": "Expense",
+      "date": "2027-03-15",
+      "planned": 165.00,
+      "actual": 165.00,
+      "status": "AsPlanned"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000011",
+      "name": "Streaming vidéo",
+      "kind": "Expense",
+      "date": "2027-03-20",
+      "planned": 13.49,
+      "actual": 13.49,
+      "status": "AsPlanned"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000012",
+      "name": "Salaire",
+      "kind": "Income",
+      "date": "2027-03-28",
+      "planned": 2250.00,
+      "actual": 2250.00,
+      "status": "AsPlanned"
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000013",
+      "name": "Virement épargne",
+      "kind": "Expense",
+      "date": "2027-03-29",
+      "planned": 150.00,
+      "actual": 150.00,
+      "status": "AsPlanned"
+    }
+  ]
 }

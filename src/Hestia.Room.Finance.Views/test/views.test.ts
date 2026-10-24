@@ -12,9 +12,9 @@ import { startView } from "../src/shared/view";
 import { asHostApp, at, fakeApp, ManualResizeObserver, pageSkeleton, plain, toolResult } from "./helpers";
 
 // The fixtures are the structured content of the view tools on the demo plan, written and checked by a C# test.
-// Typed by annotation, not by assertion: the compiler checks that they match the interfaces. The subscriptions need
-// an assertion, since JSON gives their enums as plain strings, not as the union types.
-const demoMonth: MonthSummaryOutput = monthFixture;
+// Typed by annotation, not by assertion: the compiler checks that they match the interfaces. The month and the
+// subscriptions need an assertion, since JSON gives their enums as plain strings, not as the union types.
+const demoMonth = monthFixture as MonthSummaryOutput;
 const demoForecast: CashFlowForecastOutput = forecastFixture;
 const demoSubscriptions = subscriptionsFixture as SubscriptionsOutput;
 

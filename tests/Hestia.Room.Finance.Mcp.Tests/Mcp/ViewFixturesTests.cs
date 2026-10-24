@@ -47,17 +47,21 @@ public class ViewFixturesTests(McpServerFixture mcp)
         Assert.Equal(expected, actual);
     }
 
+    /// <summary>The lists of the view outputs whose items carry an identifier.</summary>
+    private static readonly string[] ListsWithIds = ["subscriptions", "budgets", "lines"];
+
     /// <summary>
-    /// Identifiers change with every seed (Guid v7): replaced by stable ones, distinct for each item, so that a view
-    /// keyed on them would still see different identifiers.
+    /// Identifiers change with every seed (Guid v7): replaced by stable ones, distinct across every item of every list,
+    /// so that a view keyed on them would still see different identifiers.
     /// </summary>
     private static JsonNode WithFixedIds(JsonNode node)
     {
         var copy = node.DeepClone();
         var index = 0;
-        foreach (var item in copy["subscriptions"]?.AsArray() ?? [])
+        foreach (var item in ListsWithIds.SelectMany(list => copy[list]?.AsArray() ?? []))
         {
-            item!["id"] = $"00000000-0000-0000-0000-{++index:D12}";
+            Assert.NotNull(item!["id"]);
+            item["id"] = $"00000000-0000-0000-0000-{++index:D12}";
         }
         return copy;
     }
