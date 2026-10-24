@@ -239,12 +239,15 @@ public partial class McpEndpointTests(McpServerFixture mcp)
         Assert.Equal(0m, await StartingBalanceAsync("2031-06"));
     }
 
-    [Fact]
-    public async Task Request_FromAnAllowedHostOrigin_IsServed()
+    [Theory]
+    [InlineData("http://localhost:8080")]
+    [InlineData("http://localhost:6274")]
+    public async Task Request_FromAnAllowedHostOrigin_IsServed(string origin)
     {
-        // The origin of a local web host allowed in Development (Cors:DevMcpHostOrigins).
+        // The origins of the local web hosts allowed in Development (Cors:DevMcpHostOrigins): a future Hestia shell, and
+        // the MCP Inspector, whose page sends its own origin (refused by T9 until the Inspector check of T10).
         using var request = McpTestClient.CreateRequest("tools/list");
-        request.Headers.Add("Origin", "http://localhost:8080");
+        request.Headers.Add("Origin", origin);
 
         using var response = await _mcp.Http.SendAsync(request, TestContext.Current.CancellationToken);
 

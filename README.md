@@ -184,7 +184,7 @@ Every change goes through a pull request: `main` is protected, and the CI (build
 
 ## Security
 
-This is a local development build: the MCP endpoint has **no authentication yet** and must not be exposed as is. The input tools are hidden from the model by the MCP Apps hosts only (visibility `app`; a host without MCP Apps support offers them to its model), and **this is not access control**: any MCP client reaching the endpoint can call them. Every value still goes through the rules of the domain before being saved, and a request sent by a web page is refused unless its `Origin` is an allowed host origin (Development: `Cors:DevMcpHostOrigins`). The hardening planned before any deployment is tracked in [#2](https://github.com/alexismoreaullobera/hestia-room-finance/issues/2).
+This is a local development build: the MCP endpoint has **no authentication yet** and must not be exposed as is. The input tools are hidden from the model by the MCP Apps hosts only (visibility `app`; a host without MCP Apps support offers them to its model), and **this is not access control**: any MCP client reaching the endpoint can call them. Every value still goes through the rules of the domain before being saved, and a request sent by a web page is refused unless its `Origin` is an allowed host origin (Development: `Cors:DevMcpHostOrigins`, the MCP Inspector `http://localhost:6274` included). The hardening planned before any deployment is tracked in [#2](https://github.com/alexismoreaullobera/hestia-room-finance/issues/2).
 
 Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md).
 
