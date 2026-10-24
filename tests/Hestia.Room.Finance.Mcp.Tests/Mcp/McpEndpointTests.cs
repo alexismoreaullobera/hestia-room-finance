@@ -26,6 +26,8 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
     private static readonly string[] DataTools = ["get_month_summary", "get_cash_flow_forecast", "list_recurring_lines", "list_subscriptions"];
 
+    private static readonly string[] InputTools = ["set_starting_balance"];
+
     public static TheoryData<string, string, string> ViewToolsViewsAndTitles =>
         new(ViewTable.Select(v => (v.ViewTool, v.ViewUri, v.Title)));
 
@@ -47,12 +49,24 @@ public partial class McpEndpointTests(McpServerFixture mcp)
     private readonly McpTestClient _mcp = new(mcp.Server.CreateClient());
 
     [Fact]
-    public async Task TheServer_ExposesExactlyTheDataToolsAndTheViewTools()
+    public async Task TheServer_ExposesExactlyTheDataToolsTheViewToolsAndTheInputTools()
     {
         // Pitfall: WithTools(typeof(X)) compiled but registered no tool at all. Also catches the spike coming back.
         var names = (await _mcp.SendAsync("tools/list"))["tools"]!.AsArray().Select(t => (string)t!["name"]!);
 
-        Assert.Equal(DataTools.Concat(ViewTable.Select(v => v.ViewTool)).Order(), names.Order());
+        Assert.Equal(DataTools.Concat(ViewTable.Select(v => v.ViewTool)).Concat(InputTools).Order(), names.Order());
+    }
+
+    [Fact]
+    public async Task OnlyTheInputTools_AreHiddenFromTheModel()
+    {
+        // The agent has no write access in the v1: every tool it is offered reads, every write is for the views.
+        var tools = (await _mcp.SendAsync("tools/list"))["tools"]!.AsArray();
+        var appOnly = tools.Where(t => t!["_meta"]?["ui"]?["visibility"]?.AsArray().Select(v => (string?)v).SequenceEqual(["app"]) == true);
+        var writes = tools.Where(t => (bool?)t!["annotations"]?["readOnlyHint"] != true);
+
+        Assert.Equal(InputTools, appOnly.Select(t => (string)t!["name"]!).Order());
+        Assert.Equal(InputTools, writes.Select(t => (string)t!["name"]!).Order());
     }
 
     [Fact]

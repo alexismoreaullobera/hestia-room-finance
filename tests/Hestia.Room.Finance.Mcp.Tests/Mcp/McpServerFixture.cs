@@ -4,7 +4,8 @@ namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 
 /// <summary>
 /// One SQL Server container and one in-memory MCP server for every /mcp test of the run. The server migrates its
-/// database and seeds the demo plan at startup (Development); the tools only read, so the tests can share it.
+/// database and seeds the demo plan at startup (Development). The tests share it: the input tools write only to months
+/// years after the demo plan, which no other test reads (see <see cref="InputToolsEndpointTests"/>).
 /// </summary>
 public sealed class McpServerFixture : IAsyncLifetime
 {

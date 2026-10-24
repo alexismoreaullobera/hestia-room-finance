@@ -33,7 +33,7 @@ public class MonthPlanTests
     [MemberData(nameof(BalancesTooLarge))]
     public void StartingBalance_BeyondTheBound_Throws(decimal balance)
     {
-        // Written as literals, not with Guard.MaxAmount: the bound is a rule of the room, changing it must break a test.
+        // Written as literals, not with AmountLimit.Max: the bound is a rule of the room, changing it must break a test.
         var error = Assert.Throws<ArgumentOutOfRangeException>(() => new MonthPlan(April, balance));
 
         Assert.Equal("startingBalance", error.ParamName);

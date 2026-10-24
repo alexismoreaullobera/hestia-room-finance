@@ -28,6 +28,7 @@ builder.Services.AddMcpServer()
     // Explicit registration: only the tools and views listed here are exposed.
     .WithTools<FinanceDataTools>()
     .WithTools<FinanceViewTools>()
+    .WithTools<FinanceInputTools>()
     .WithResources(FinanceViewResources.Create())
     .WithMcpApps();
 
