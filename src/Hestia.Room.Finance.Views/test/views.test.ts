@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewContext } from "../src/shared/view";
 import { cashFlowForecast, chart, MIN_WIDTH } from "../src/cash-flow-forecast";
 import { monthOverview } from "../src/month-overview";
@@ -8,7 +8,8 @@ import { subscriptions } from "../src/subscriptions";
 import forecastFixture from "./fixtures/cash-flow-forecast.json";
 import monthFixture from "./fixtures/month-overview.json";
 import subscriptionsFixture from "./fixtures/subscriptions.json";
-import { at, plain } from "./helpers";
+import { startView } from "../src/shared/view";
+import { asHostApp, at, fakeApp, ManualResizeObserver, pageSkeleton, plain, toolResult } from "./helpers";
 
 // The fixtures are the structured content of the view tools on the demo plan, written and checked by a C# test.
 // Typed by annotation, not by assertion: the compiler checks that they match the interfaces. The subscriptions need
@@ -138,7 +139,7 @@ describe("starting balance form", () => {
     expect(card().querySelector("input")).toBeNull();
   });
 
-  it("opens a field prefilled with the balance, named after the month, and focused", () => {
+  it("opens a field prefilled with the balance, named after the month, focused and selected", () => {
     open();
 
     expect(card().classList.contains("editing")).toBe(true);
@@ -146,20 +147,27 @@ describe("starting balance form", () => {
     expect(field().getAttribute("inputmode")).toBe("decimal");
     expect(field().getAttribute("aria-label")).toBe("Solde de départ de Mars 2027");
     expect(document.activeElement).toBe(field());
+    // Selected: typing replaces the value at once.
+    expect([field().selectionStart, field().selectionEnd]).toEqual([0, field().value.length]);
   });
 
-  it("sends the month and the amount typed to the input tool, disabling the form meanwhile", () => {
+  it("sends the month and the amount typed when Enregistrer is clicked, disabling the form meanwhile", () => {
     const call = open(vi.fn<ViewContext["call"]>(() => new Promise(() => {})));
     field().value = "-1 250,50";
 
-    const event = submit();
+    // The real path: the button submits its form (a type="button" would do nothing here).
+    buttonNamed("Enregistrer").click();
 
-    // Never the default submission, which would navigate the frame of the view.
-    expect(event.defaultPrevented).toBe(true);
     expect(call).toHaveBeenCalledExactlyOnceWith("set_starting_balance", { month: "2027-03", startingBalance: -1250.5 });
     expect(field().disabled).toBe(true);
     expect(buttonNamed("Enregistrer").disabled).toBe(true);
     expect(buttonNamed("Annuler").disabled).toBe(true);
+  });
+
+  it("never lets the form be submitted by default, which would navigate the frame of the view", () => {
+    open(vi.fn<ViewContext["call"]>(() => new Promise(() => {})));
+
+    expect(submit().defaultPrevented).toBe(true);
   });
 
   it.each(["", "abc", "12,345"])("refuses %j without calling the tool, keeping the form open", (typed) => {
@@ -174,6 +182,16 @@ describe("starting balance form", () => {
     expect(field().value).toBe(typed);
   });
 
+  it("brings the focus back to the field on a wrong amount", () => {
+    open();
+    field().value = "abc";
+    buttonNamed("Annuler").focus();
+
+    submit();
+
+    expect(document.activeElement).toBe(field());
+  });
+
   it("enables the form again with what was typed when the save is not shown", async () => {
     const call = open(vi.fn<ViewContext["call"]>(() => Promise.resolve(false)));
     field().value = "300";
@@ -184,6 +202,7 @@ describe("starting balance form", () => {
     expect(call).toHaveBeenCalledOnce();
     expect(field().value).toBe("300");
     expect(buttonNamed("Enregistrer").disabled).toBe(false);
+    expect(buttonNamed("Annuler").disabled).toBe(false);
     expect(document.activeElement).toBe(field());
   });
 
@@ -211,6 +230,41 @@ describe("starting balance form", () => {
     expect(card().classList.contains("editing")).toBe(false);
     expect(plain(card().querySelector(".big")?.textContent)).toBe(euros(demoForecast.startingBalance));
     expect(document.activeElement).toBe(buttonNamed("Modifier"));
+  });
+
+  it.each(["a", "Enter", "Tab"])("keeps the form open on the key %s", (key) => {
+    const call = open();
+
+    field().dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+
+    expect(card().querySelector("form")).not.toBeNull();
+    expect(call).not.toHaveBeenCalled();
+  });
+});
+
+describe("starting balance saved through startView", () => {
+  // The form and the kit together, the SDK being the only fake: what a user sees after Enregistrer.
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("redraws the card with the figure of the server, the focus back on Modifier", async () => {
+    vi.stubGlobal("ResizeObserver", ManualResizeObserver);
+    const page = pageSkeleton();
+    const app = fakeApp();
+    // The server answers with its own figure (rounded, recalculated): the view shows it, never what was typed.
+    app.callServerTool.mockResolvedValue(toolResult({ structuredContent: { ...demoForecast, startingBalance: 300 } }));
+    await startView(cashFlowForecast, asHostApp(app));
+    app.sendResult(toolResult({ structuredContent: { ...demoForecast } }));
+    const balanceCard = () => page.querySelector<HTMLElement>(".starting-balance")!;
+    [...balanceCard().querySelectorAll("button")].find(b => b.textContent === "Modifier")!.click();
+    balanceCard().querySelector("input")!.value = "300";
+
+    [...balanceCard().querySelectorAll("button")].find(b => b.textContent === "Enregistrer")!.click();
+
+    await vi.waitFor(() => { expect(balanceCard().querySelector("input")).toBeNull(); });
+    expect(app.callServerTool).toHaveBeenCalledWith({ name: "set_starting_balance", arguments: { month: "2027-03", startingBalance: 300 } });
+    expect(balanceCard().classList.contains("editing")).toBe(false);
+    expect(plain(balanceCard().querySelector(".big")?.textContent)).toBe(euros(300));
+    expect(document.activeElement).toBe(balanceCard().querySelector(".edit"));
   });
 });
 

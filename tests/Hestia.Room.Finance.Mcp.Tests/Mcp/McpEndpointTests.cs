@@ -71,8 +71,8 @@ public partial class McpEndpointTests(McpServerFixture mcp)
         var appOnly = tools.Where(t => t!["_meta"]?["ui"]?["visibility"]?.AsArray().Select(v => (string?)v).SequenceEqual(["app"]) == true);
         var writes = tools.Where(t => (bool?)t!["annotations"]?["readOnlyHint"] != true);
 
-        Assert.Equal(InputTools, appOnly.Select(t => (string)t!["name"]!).Order());
-        Assert.Equal(InputTools, writes.Select(t => (string)t!["name"]!).Order());
+        Assert.Equal(InputTools.Order(), appOnly.Select(t => (string)t!["name"]!).Order());
+        Assert.Equal(InputTools.Order(), writes.Select(t => (string)t!["name"]!).Order());
     }
 
     [Fact]
@@ -221,6 +221,54 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Request_FromAForeignOrigin_IsRefused_AndWritesNothing()
+    {
+        // A web page of another site making the browser call the server: refused before any tool runs.
+        using var request = McpTestClient.CreateRequest("tools/call", SetStartingBalance("2031-06", 10m));
+        request.Headers.Add("Origin", "https://evil.example");
+
+        using var response = await _mcp.Http.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(0m, await StartingBalanceAsync("2031-06"));
+    }
+
+    [Fact]
+    public async Task Request_FromAnAllowedHostOrigin_IsServed()
+    {
+        // The origin of a local web host allowed in Development (Cors:DevMcpHostOrigins).
+        using var request = McpTestClient.CreateRequest("tools/list");
+        request.Headers.Add("Origin", "http://localhost:8080");
+
+        using var response = await _mcp.Http.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Request_AsPlainText_IsRefused_AndWritesNothing()
+    {
+        // What a cross-site HTML form or a "simple" fetch can send without a CORS preflight: never a call.
+        using var request = McpTestClient.CreateRequest("tools/call", SetStartingBalance("2031-07", 10m));
+        request.Content = new StringContent(await request.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            System.Text.Encoding.UTF8, "text/plain");
+
+        using var response = await _mcp.Http.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.False(response.IsSuccessStatusCode);
+        Assert.Equal(0m, await StartingBalanceAsync("2031-07"));
+    }
+
+    private static JsonObject SetStartingBalance(string month, decimal startingBalance) => new()
+    {
+        ["name"] = "set_starting_balance",
+        ["arguments"] = new JsonObject { ["month"] = month, ["startingBalance"] = startingBalance },
+    };
+
+    private async Task<decimal?> StartingBalanceAsync(string month) =>
+        (decimal?)(await _mcp.CallToolAsync("get_cash_flow_forecast", new JsonObject { ["month"] = month }))["structuredContent"]!["startingBalance"];
 
     [GeneratedRegex(@"<script type=""module""")]
     private static partial Regex ModuleScript();

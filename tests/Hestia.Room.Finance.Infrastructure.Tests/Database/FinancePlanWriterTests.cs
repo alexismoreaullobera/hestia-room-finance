@@ -1,6 +1,7 @@
 using Hestia.Room.Finance.Domain;
 using Hestia.Room.Finance.Infrastructure.Rows;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using static Hestia.Room.Finance.Infrastructure.Tests.InfraTestData;
 
 namespace Hestia.Room.Finance.Infrastructure.Tests.Database;
@@ -59,15 +60,57 @@ public class FinancePlanWriterTests(SqlServerFixture sqlServer)
         Assert.Equal(new MonthPlan(April, 0m), row.ToDomain());
     }
 
-    [Fact]
-    public async Task SetStartingBalance_AtTheBound_SurvivesTheDatabase()
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(1)]
+    public async Task SetStartingBalance_AtTheBound_SurvivesTheDatabase(int sign)
     {
-        // The largest balance the domain accepts fits decimal(18,2), negative included.
+        // The largest balance the domain accepts fits decimal(18,2), either way.
         var options = await sqlServer.CreateMigratedDatabaseAsync();
+        var balance = sign * 999_999_999.99m;
 
-        await SetAsync(options, new MonthPlan(April, -999_999_999.99m));
+        await SetAsync(options, new MonthPlan(April, balance));
 
-        Assert.Equal(-999_999_999.99m, (await LoadPlanAsync(options, April)).StartingBalance);
+        Assert.Equal(balance, (await LoadPlanAsync(options, April)).StartingBalance);
+    }
+
+    [Fact]
+    public async Task SetStartingBalance_WhenAnotherFirstSaveWinsTheInsert_EndsWithTheLastValue()
+    {
+        // The writer finds no settings for April, then another request inserts them before it saves (two hosts, or a
+        // host retrying the idempotent input): its own insert hits the primary key. Made deterministic by inserting
+        // the other save from an interceptor, right before the writer's save.
+        var options = await sqlServer.CreateMigratedDatabaseAsync();
+        var racing = new DbContextOptionsBuilder<FinanceDbContext>(options)
+            .AddInterceptors(new OtherSaveFirst(options, new MonthPlan(April, 150m)))
+            .Options;
+
+        await SetAsync(racing, new MonthPlan(April, -42.50m));
+
+        // The last save wins, in the single row of the month: no error, no second row.
+        Assert.Equal(new MonthPlan(April, -42.50m), await LoadPlanAsync(options, April));
+        await using var context = new FinanceDbContext(options);
+        Assert.Equal(1, await context.MonthPlans.CountAsync(Token));
+    }
+
+    /// <summary>Saves another plan through its own context, once, just before the first save of the intercepted one.</summary>
+    private sealed class OtherSaveFirst(DbContextOptions<FinanceDbContext> options, MonthPlan other) : SaveChangesInterceptor
+    {
+        private bool _done;
+
+        public override async ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (!_done)
+            {
+                _done = true;
+                await using var otherContext = new FinanceDbContext(options);
+                otherContext.MonthPlans.Add(other.ToRow());
+                await otherContext.SaveChangesAsync(cancellationToken);
+            }
+
+            return result;
+        }
     }
 
     private static async Task SetAsync(DbContextOptions<FinanceDbContext> options, MonthPlan plan)

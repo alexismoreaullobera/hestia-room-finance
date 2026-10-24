@@ -1,3 +1,4 @@
+using System.Globalization;
 using static Hestia.Room.Finance.Domain.Tests.TestPlan;
 
 namespace Hestia.Room.Finance.Domain.Tests;
@@ -37,6 +38,22 @@ public class MonthPlanTests
         var error = Assert.Throws<ArgumentOutOfRangeException>(() => new MonthPlan(April, balance));
 
         Assert.Equal("startingBalance", error.ParamName);
+    }
+
+    [Fact]
+    public void StartingBalance_BeyondTheBound_StatesItInvariantly()
+    {
+        // The message reaches the logs (a row read back goes through the domain): the same in every culture.
+        var culture = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("fr-FR");
+        try
+        {
+            Assert.Contains("999999999.99", Assert.Throws<ArgumentOutOfRangeException>(() => new MonthPlan(April, 1_000_000_000m)).Message);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = culture;
+        }
     }
 
     [Fact]

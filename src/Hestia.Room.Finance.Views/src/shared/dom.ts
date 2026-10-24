@@ -26,12 +26,17 @@ export interface ElementOptions {
   attributes?: Attributes;
 }
 
-/**
- * The tags a view may create: never one that runs or loads something (a script, a style, a frame, an embedded object,
- * a base URL, a link or a meta tag), so that no text given to the kit can become code, style or a navigation.
- */
-export type SafeTag = Exclude<keyof HTMLElementTagNameMap,
-  "script" | "style" | "iframe" | "frame" | "frameset" | "object" | "embed" | "base" | "link" | "meta">;
+// The tags a view may never create: the ones that run or load something (a script, a style, a frame, an embedded
+// object, a base URL, a link or a meta tag), so that no text given to the kit can become code, style or a navigation.
+// Refused by the types (SafeTag, SafeSvgTag) and again at run time, since a cast gets round the types.
+const UNSAFE_TAGS = ["script", "style", "iframe", "frame", "frameset", "object", "embed", "base", "link", "meta"] as const;
+
+export type SafeTag = Exclude<keyof HTMLElementTagNameMap, (typeof UNSAFE_TAGS)[number]>;
+export type SafeSvgTag = Exclude<keyof SVGElementTagNameMap, (typeof UNSAFE_TAGS)[number]>;
+
+function checkTag(tag: string): void {
+  if ((UNSAFE_TAGS as readonly string[]).includes(tag.toLowerCase())) throw new Error(`Tag not allowed in a view: ${tag}`);
+}
 
 /**
  * Creates an element. Text is set with textContent only (strings among the children become text nodes), never as
@@ -39,6 +44,7 @@ export type SafeTag = Exclude<keyof HTMLElementTagNameMap,
  */
 export function element<K extends SafeTag>(
   tag: K, { className, text, attributes }: ElementOptions = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
+  checkTag(tag);
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
@@ -47,9 +53,10 @@ export function element<K extends SafeTag>(
   return node;
 }
 
-/** Creates an SVG element, with the same rules as element(): safe attributes only, strings as text nodes. */
-export function svg<K extends keyof SVGElementTagNameMap>(
+/** Creates an SVG element, with the same rules as element(): safe tags and attributes only, strings as text nodes. */
+export function svg<K extends SafeSvgTag>(
   tag: K, attributes: Attributes = {}, ...children: (Node | string)[]): SVGElementTagNameMap[K] {
+  checkTag(tag);
   const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
   setAttributes(node, attributes);
   node.append(...children);

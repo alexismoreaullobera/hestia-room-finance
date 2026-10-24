@@ -1,4 +1,7 @@
 using System.Text.Json.Nodes;
+using Hestia.Room.Finance.Infrastructure;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 
@@ -52,7 +55,7 @@ public class InputToolsEndpointTests(McpServerFixture mcp)
     {
         var result = await SetAsync("2031-01", 1234.56m);
 
-        Assert.Null((bool?)result["isError"]);
+        Assert.NotEqual(true, (bool?)result["isError"]);
         Assert.Equal(1234.56m, (decimal?)result["structuredContent"]!["startingBalance"]);
         // The data tool, called afterwards, reads the saved value: same text, same structured content.
         var forecast = await _mcp.CallToolAsync("get_cash_flow_forecast", new JsonObject { ["month"] = "2031-01" });
@@ -80,25 +83,29 @@ public class InputToolsEndpointTests(McpServerFixture mcp)
         { """{ "month": "2031-02", "startingBalance": 12.345 }""", "two decimals" },
         { """{ "month": "2031-02", "startingBalance": 1000000000 }""", "999999999.99" },
         { """{ "month": "2031-02", "startingBalance": -1000000000 }""", "999999999.99" },
-        // Beyond decimal itself, of the wrong type, missing: refused by the SDK before the tool, with its generic message.
-        { """{ "month": "2031-02", "startingBalance": 1e40 }""", "An error occurred" },
-        { """{ "month": "2031-02", "startingBalance": "douze" }""", "An error occurred" },
+        // Beyond decimal itself, of the wrong type, missing: refused by the SDK before the tool, with its generic message
+        // (the whole message: a crash inside the tool would give the same words with another tool name, never these).
+        { """{ "month": "2031-02", "startingBalance": 1e40 }""", "An error occurred invoking 'set_starting_balance'." },
+        { """{ "month": "2031-02", "startingBalance": "douze" }""", "An error occurred invoking 'set_starting_balance'." },
         { """{ "month": "2031-02", "startingBalance": "12.345" }""", "two decimals" },
-        { """{ "month": "2031-02" }""", "An error occurred" },
-        { """{ "startingBalance": 10 }""", "An error occurred" },
+        { """{ "month": "2031-02" }""", "An error occurred invoking 'set_starting_balance'." },
+        { """{ "startingBalance": 10 }""", "An error occurred invoking 'set_starting_balance'." },
     };
 
     [Theory]
     [MemberData(nameof(InvalidCalls))]
     public async Task ToolsCall_WithInvalidArguments_IsAToolError_AndWritesNothing(string arguments, string expectedMessage)
     {
+        var before = await MonthPlansAsync();
+
         var result = await _mcp.CallToolAsync("set_starting_balance", JsonNode.Parse(arguments)!.AsObject());
 
         // A tool error (isError), not a JSON-RPC error: the view shows its message and keeps the form open.
         Assert.True((bool?)result["isError"]);
         Assert.Contains(expectedMessage, Text(result));
-        // 2031-02 is only ever written by these invalid calls: its balance stays the default 0 €.
-        Assert.Equal(0m, await StartingBalanceAsync("2031-02"));
+        // Nothing written anywhere: not 2031-02, and not the current month a wrong fallback would write to (the demo
+        // month the other classes of the collection read). The tests of a collection run one after the other.
+        Assert.Equal(before, await MonthPlansAsync());
     }
 
     [Fact]
@@ -108,8 +115,17 @@ public class InputToolsEndpointTests(McpServerFixture mcp)
         // domain like any number (the case "12.345" above is refused).
         var result = await _mcp.CallToolAsync("set_starting_balance", JsonNode.Parse("""{ "month": "2031-05", "startingBalance": "12.50" }""")!.AsObject());
 
-        Assert.Null((bool?)result["isError"]);
+        Assert.NotEqual(true, (bool?)result["isError"]);
         Assert.Equal(12.5m, await StartingBalanceAsync("2031-05"));
+    }
+
+    /// <summary>Every saved month setting, read straight from the database: tells a row at 0 € from no row at all.</summary>
+    private async Task<List<(DateOnly Month, decimal StartingBalance)>> MonthPlansAsync()
+    {
+        using var scope = mcp.Server.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
+        var rows = await context.MonthPlans.AsNoTracking().OrderBy(p => p.Month).ToListAsync(TestContext.Current.CancellationToken);
+        return rows.Select(p => (p.Month, p.StartingBalance)).ToList();
     }
 
     private Task<JsonNode> SetAsync(string month, decimal startingBalance) =>

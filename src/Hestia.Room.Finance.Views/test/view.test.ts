@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { amount, card, element, svg } from "../src/shared/dom";
+import { amount, card, element, svg, type SafeSvgTag, type SafeTag } from "../src/shared/dom";
 import { formatAmount, formatDate, formatDay, formatEuros, formatMonth, parseEuros, shiftMonth, translate } from "../src/shared/format";
 import { applyHostTheme } from "../src/shared/view";
 import { plain } from "./helpers";
@@ -42,7 +42,7 @@ describe("formats", () => {
     expect(parseEuros(text)).toBe(expected);
   });
 
-  it.each(["", " ", "abc", "12,345", "1,2,3", "1.250,50", "12 50", "1 2500", "+12", "--12", "12-", ",5", "12,", "€12", "1e3", "0x10", "Infinity"])(
+  it.each(["", " ", "abc", "12,345", "1,2,3", "1.250,50", "12 50", "1 2500", "1234 567", "+12", "--12", "12-", ",5", "12,", "€12", "1e3", "0x10", "Infinity"])(
     "parseEuros(%j) is null", (text) => {
       expect(parseEuros(text)).toBeNull();
     });
@@ -95,6 +95,19 @@ describe("element and svg", () => {
     expect(node.getAttribute("x")).toBe("1");
     expect(node.getAttribute("aria-label")).toBe("Courbe");
   });
+
+  it("refuses at compile time a tag that runs or loads something", () => {
+    // @ts-expect-error script is no SafeTag: the call does not compile.
+    expect(() => element("script", { text: "alert(1)" })).toThrow(/not allowed/);
+    // @ts-expect-error nor in SVG.
+    expect(() => svg("script")).toThrow(/not allowed/);
+  });
+
+  it.each(["script", "style", "iframe", "frame", "frameset", "object", "embed", "base", "link", "meta", "SCRIPT"])(
+    "refuses at run time the tag %s, even through a cast", (tag) => {
+      expect(() => element(tag as SafeTag)).toThrow(/not allowed/);
+      expect(() => svg(tag as SafeSvgTag)).toThrow(/not allowed/);
+    });
 
   it("accepts the kind of a form field, never its value as an attribute", () => {
     const field = element("input", { attributes: { type: "text", inputmode: "decimal", autocomplete: "off" } });

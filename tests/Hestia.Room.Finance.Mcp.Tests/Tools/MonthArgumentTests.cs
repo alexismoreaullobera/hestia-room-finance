@@ -57,6 +57,13 @@ public class MonthArgumentTests
     }
 
     [Fact]
+    public void Parse_WithoutAMonth_SaysThereIsNone()
+    {
+        // "month": null, which the SDK binds even into a non-nullable string.
+        Assert.Contains("(none)", Assert.Throws<McpException>(() => MonthArgument.Parse(null)).Message);
+    }
+
+    [Fact]
     public void Resolve_WithALongInvalidMonth_DoesNotEchoIt()
     {
         // The message goes back into the model context: a long value is never copied there.

@@ -333,6 +333,8 @@ describe("startView", () => {
       expect(await call("set_test", {})).toBe(false);
 
       expect(app.callServerTool).toHaveBeenCalledOnce();
+      // The status still speaks of the navigation: the refused call changes nothing.
+      expect(byId("status").textContent).toBe("Chargement…");
     });
 
     it("lets a result of the agent win over a save still pending, and ignores its late answer", async () => {
@@ -350,6 +352,24 @@ describe("startView", () => {
       expect(byId("month").textContent).toBe("Janvier 2027");
       expect(render).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it("never renders on a resize while a form is open, which would close it", async () => {
+    // As the starting balance card in edit mode: a form in the content.
+    render.mockImplementation((_, node) => { node.append(document.createElement("form")); });
+    const app = fakeApp();
+    await startView(view, asHostApp(app));
+    setWidth(content, 640);
+    app.sendResult(result("2026-10"));
+
+    setWidth(content, 480);
+    ManualResizeObserver.last!.trigger();
+    expect(render).toHaveBeenCalledOnce();
+
+    // Form closed: the next resize redraws at the new width.
+    content.querySelector("form")!.remove();
+    ManualResizeObserver.last!.trigger();
+    expect(render).toHaveBeenCalledTimes(2);
   });
 
   it("does not render on a resize before the first result", async () => {
