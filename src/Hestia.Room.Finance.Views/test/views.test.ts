@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ViewContext } from "../src/shared/view";
 import { cashFlowForecast, chart, MIN_WIDTH } from "../src/cash-flow-forecast";
 import { monthOverview } from "../src/month-overview";
 import type { CashFlowForecastOutput, MonthSummaryOutput, SubscriptionOutput, SubscriptionsOutput } from "../src/shared/outputs";
@@ -109,6 +110,107 @@ describe("cash flow forecast", () => {
 
     expect(content.querySelector("img")).toBeNull();
     expect(texts("tbody tr td:nth-child(2)")).toEqual([trap]);
+  });
+});
+
+describe("starting balance form", () => {
+  const card = () => content.querySelector<HTMLElement>(".starting-balance")!;
+  const field = () => card().querySelector("input")!;
+  const buttonNamed = (name: string) => [...card().querySelectorAll("button")].find(b => b.textContent === name)!;
+  /** Submits the form as the Enregistrer button or the Enter key would; returns the event to check its default. */
+  const submit = () => {
+    const event = new Event("submit", { cancelable: true });
+    card().querySelector("form")!.dispatchEvent(event);
+    return event;
+  };
+
+  function open(call = vi.fn<ViewContext["call"]>(() => Promise.resolve(true))) {
+    cashFlowForecast.render(demoForecast, content, at(640, call));
+    buttonNamed("Modifier").click();
+    return call;
+  }
+
+  it("shows the balance with a button to change it, and no field", () => {
+    cashFlowForecast.render(demoForecast, content, at(640));
+
+    expect(plain(card().querySelector(".big")?.textContent)).toBe(euros(demoForecast.startingBalance));
+    expect(buttonNamed("Modifier").getAttribute("type")).toBe("button");
+    expect(card().querySelector("input")).toBeNull();
+  });
+
+  it("opens a field prefilled with the balance, named after the month, and focused", () => {
+    open();
+
+    expect(card().classList.contains("editing")).toBe(true);
+    expect(plain(field().value)).toBe("400,00");
+    expect(field().getAttribute("inputmode")).toBe("decimal");
+    expect(field().getAttribute("aria-label")).toBe("Solde de départ de Mars 2027");
+    expect(document.activeElement).toBe(field());
+  });
+
+  it("sends the month and the amount typed to the input tool, disabling the form meanwhile", () => {
+    const call = open(vi.fn<ViewContext["call"]>(() => new Promise(() => {})));
+    field().value = "-1 250,50";
+
+    const event = submit();
+
+    // Never the default submission, which would navigate the frame of the view.
+    expect(event.defaultPrevented).toBe(true);
+    expect(call).toHaveBeenCalledExactlyOnceWith("set_starting_balance", { month: "2027-03", startingBalance: -1250.5 });
+    expect(field().disabled).toBe(true);
+    expect(buttonNamed("Enregistrer").disabled).toBe(true);
+    expect(buttonNamed("Annuler").disabled).toBe(true);
+  });
+
+  it.each(["", "abc", "12,345"])("refuses %j without calling the tool, keeping the form open", (typed) => {
+    const call = open();
+    field().value = typed;
+
+    submit();
+
+    expect(call).not.toHaveBeenCalled();
+    expect(card().querySelector(".field-error")?.textContent).toBe("Montant attendu, par exemple 1 250,50.");
+    expect(card().querySelector(".field-error")?.getAttribute("role")).toBe("alert");
+    expect(field().value).toBe(typed);
+  });
+
+  it("enables the form again with what was typed when the save is not shown", async () => {
+    const call = open(vi.fn<ViewContext["call"]>(() => Promise.resolve(false)));
+    field().value = "300";
+
+    submit();
+
+    await vi.waitFor(() => { expect(field().disabled).toBe(false); });
+    expect(call).toHaveBeenCalledOnce();
+    expect(field().value).toBe("300");
+    expect(buttonNamed("Enregistrer").disabled).toBe(false);
+    expect(document.activeElement).toBe(field());
+  });
+
+  it("clears the message of a wrong amount once a right one is sent", () => {
+    open();
+    field().value = "abc";
+    submit();
+
+    field().value = "300";
+    submit();
+
+    expect(card().querySelector(".field-error")?.textContent).toBe("");
+  });
+
+  it.each([
+    ["Annuler", () => { buttonNamed("Annuler").click(); }],
+    ["Échap", () => { field().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); }],
+  ])("closes the form without saving on %s, back to the button", (_, close) => {
+    const call = open();
+    field().value = "999";
+
+    close();
+
+    expect(call).not.toHaveBeenCalled();
+    expect(card().classList.contains("editing")).toBe(false);
+    expect(plain(card().querySelector(".big")?.textContent)).toBe(euros(demoForecast.startingBalance));
+    expect(document.activeElement).toBe(buttonNamed("Modifier"));
   });
 });
 

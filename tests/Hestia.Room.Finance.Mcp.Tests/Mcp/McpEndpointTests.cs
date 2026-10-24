@@ -28,6 +28,12 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
     private static readonly string[] InputTools = ["set_starting_balance"];
 
+    /// <summary>The input tools each view calls from its forms (literals too: renaming one must break the views).</summary>
+    private static readonly Dictionary<string, string[]> InputToolsOfViews = new()
+    {
+        ["ui://finance/cash-flow-forecast.html"] = ["set_starting_balance"],
+    };
+
     public static TheoryData<string, string, string> ViewToolsViewsAndTitles =>
         new(ViewTable.Select(v => (v.ViewTool, v.ViewUri, v.Title)));
 
@@ -175,15 +181,20 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
     [Theory]
     [MemberData(nameof(ViewToolsAndViews))]
-    public async Task AView_CallsOnlyItsOwnTool_AndHasEveryPageElement(string viewTool, string viewUri)
+    public async Task AView_CallsOnlyItsOwnTools_AndHasEveryPageElement(string viewTool, string viewUri)
     {
-        // A view wired to another tool would navigate into the wrong view; a page without one of the ids that
-        // startView requires would stay blank. The ids come from view.ts, the single list both sides read.
+        // A view wired to another tool would navigate into the wrong view or write to the wrong figure; a page without
+        // one of the ids that startView requires would stay blank. The ids come from view.ts, the single list both
+        // sides read. The tools looked for are the ones the server exposes: the SDK bundled in the view has its own
+        // words (list_changed), which are no tool.
         var html = (string)(await ReadViewAsync(viewUri))["text"]!;
         var view = File.ReadAllText(Path.Combine(ViewFixturesTests.ViewsProjectDirectory(), "src", "shared", "view.ts"));
         var pageIds = Quoted().Matches(PageIds().Match(view).Groups[1].Value).Select(m => m.Groups[1].Value).ToList();
+        var serverTools = (await _mcp.SendAsync("tools/list"))["tools"]!.AsArray().Select(t => (string)t!["name"]!);
 
-        Assert.Equal([viewTool], ViewToolName().Matches(html).Select(m => m.Value));
+        var mentioned = serverTools.Where(name => Regex.IsMatch(html, $@"\b{Regex.Escape(name)}\b"));
+
+        Assert.Equal(InputToolsOfViews.GetValueOrDefault(viewUri, []).Append(viewTool).Order(), mentioned.Order());
         Assert.Equal(["label", "previous", "month", "next", "status", "content"], pageIds);
         Assert.All(pageIds, id => Assert.Contains($"id=\"{id}\"", html));
     }
@@ -217,9 +228,6 @@ public partial class McpEndpointTests(McpServerFixture mcp)
     // A src or href attribute pointing to another origin (any scheme, or protocol relative).
     [GeneratedRegex(@"\b(?:src|href)\s*=\s*[""']?(?:[a-z][a-z0-9+.-]*:)?//", RegexOptions.IgnoreCase)]
     private static partial Regex ExternalLoad();
-
-    [GeneratedRegex(@"\bshow_[a-z_]+\b")]
-    private static partial Regex ViewToolName();
 
     [GeneratedRegex(@"PAGE_IDS = \[([^\]]+)\]")]
     private static partial Regex PageIds();

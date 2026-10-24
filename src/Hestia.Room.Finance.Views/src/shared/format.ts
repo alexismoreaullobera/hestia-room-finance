@@ -9,6 +9,13 @@ export function formatEuros(amount: number): string {
   return euros.format(amount);
 }
 
+const decimal = new Intl.NumberFormat("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** 1234.5 -> "1 234,50": an amount to edit in a field, without the euro sign; parseEuros reads it back. */
+export function formatAmount(amount: number): string {
+  return decimal.format(amount);
+}
+
 /** "2026-10" -> "Octobre 2026". */
 export function formatMonth(month: string): string {
   const [year = 0, monthNumber = 1] = month.split("-").map(Number);

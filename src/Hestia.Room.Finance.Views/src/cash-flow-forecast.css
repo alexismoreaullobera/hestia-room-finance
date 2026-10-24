@@ -8,3 +8,34 @@
 .chart .day { fill: transparent; }
 .chart .day:hover { fill: var(--line); opacity: .4; }
 h2 { font-size: 14px; margin: 16px 0 4px; }
+
+/* The starting balance card, editable in place (option A: the field takes the place of the figure). */
+.starting-balance button,
+.starting-balance input {
+  font: inherit;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+.starting-balance button { padding: 2px 10px; cursor: pointer; }
+.starting-balance button:hover:not(:disabled) { border-color: var(--accent); }
+.starting-balance button:focus-visible,
+.starting-balance input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.starting-balance button:disabled,
+.starting-balance input:disabled { opacity: .5; cursor: default; }
+.starting-balance .edit { margin-top: 6px; font-size: 12px; }
+.starting-balance input {
+  width: 100%;
+  margin: 4px 0 6px;
+  padding: 4px 8px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.starting-balance .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.starting-balance .field-error { color: var(--negative); font-size: 12px; margin-top: 4px; }
+.starting-balance .field-error:empty { display: none; }
+/* A narrow view: the card being edited takes the whole row, so that the field and its buttons have room. */
+@media (max-width: 520px) {
+  .starting-balance.editing { grid-column: 1 / -1; }
+}

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { amount, card, element, svg } from "../src/shared/dom";
-import { formatDate, formatDay, formatEuros, formatMonth, parseEuros, shiftMonth, translate } from "../src/shared/format";
+import { formatAmount, formatDate, formatDay, formatEuros, formatMonth, parseEuros, shiftMonth, translate } from "../src/shared/format";
 import { applyHostTheme } from "../src/shared/view";
 import { plain } from "./helpers";
 
@@ -47,9 +47,14 @@ describe("formats", () => {
       expect(parseEuros(text)).toBeNull();
     });
 
-  it.each([-1192.41, 0, 1250.5, 999999999.99])("reads back what formatEuros writes: %d", (value) => {
-    // The form is prefilled from the figures shown: a value left as is must be sent back unchanged.
+  it.each([-1192.41, 0, 1250.5, 999999999.99])("reads back what formatEuros and formatAmount write: %d", (value) => {
+    // The form is prefilled with formatAmount: a value left as is must be sent back unchanged.
     expect(parseEuros(formatEuros(value))).toBe(value);
+    expect(parseEuros(formatAmount(value))).toBe(value);
+  });
+
+  it("formats an amount to edit without the euro sign", () => {
+    expect(plain(formatAmount(-1250.5))).toBe("-1 250,50");
   });
 
   it("translate never returns an inherited property", () => {
