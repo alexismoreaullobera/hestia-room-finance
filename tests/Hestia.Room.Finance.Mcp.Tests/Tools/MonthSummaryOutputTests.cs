@@ -112,6 +112,40 @@ public class MonthSummaryOutputTests
     }
 
     [Fact]
+    public void Budgets_AreSortedOrdinally_ThenByIdentifier()
+    {
+        // Ordinal: "Épargne" after "Sorties" (É is past every ASCII letter). Two "Courses" by identifier: a fixed one,
+        // lower than any Guid v7 and given after the other, so that keeping the input order instead would fail.
+        var savings = new Budget(Guid.CreateVersion7(), "Épargne", 50m);
+        var outings = new Budget(Guid.CreateVersion7(), "Sorties", 120m);
+        var lowGroceries = new Budget(new Guid("00000000-0000-0000-0000-000000000001"), "Courses", 80m);
+
+        var output = MonthSummaryOutput.From(April2026(0m, [], [savings, Groceries, outings, lowGroceries]));
+
+        Assert.Equal([lowGroceries.Id, Groceries.Id, outings.Id, savings.Id], output.Budgets.Select(b => b.Id));
+    }
+
+    [Fact]
+    public void Lines_LeaveOutTheOverrideOfALineNotDue()
+    {
+        // The bonus is not due in April: an override left for it (the line changed since) is not a line of the month.
+        var bonus = Quarterly("Prime", 300m, day: 30, anchorMonth: 5, kind: FlowKind.Income);
+        var rent = Monthly(FlowKind.Expense, "Loyer", 650m, day: 5);
+
+        var output = MonthSummaryOutput.From(April2026(0m, [bonus, rent], overrides: [RecurringOverride.Skipped(bonus.Id, April)]));
+
+        Assert.Equal([rent.Id], output.Lines.Select(l => l.Id));
+        Assert.DoesNotContain("Prime", output.Describe());
+    }
+
+    [Fact]
+    public void Status_IsText_EvenWithoutTheOptionsOfTheSdk()
+    {
+        // The SDK writes enums as text only with reflection on; the converter of the type keeps it so under native AOT.
+        Assert.Equal("\"Skipped\"", System.Text.Json.JsonSerializer.Serialize(LineActualStatus.Skipped, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
+    }
+
+    [Fact]
     public void Describe_NamesTheActualsEntered()
     {
         var water = Monthly(FlowKind.Expense, "Eau", 45m, day: 12);

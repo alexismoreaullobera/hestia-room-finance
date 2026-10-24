@@ -109,9 +109,21 @@ public class ActualsInputToolsEndpointTests(McpServerFixture mcp)
 
         for (var i = 0; i < 2; i++)
         {
-            Assert.NotEqual(true, (bool?)(await _mcp.CallToolAsync("set_budget_actual", Arguments("2032-04", new JsonObject { ["budgetId"] = budgetId, ["actualAmount"] = null })))["isError"]);
-            Assert.NotEqual(true, (bool?)(await _mcp.CallToolAsync("set_line_actual", Arguments("2032-04", new JsonObject { ["lineId"] = lineId, ["status"] = "AsPlanned" })))["isError"]);
+            Assert.NotEqual(true, (bool?)(await _mcp.CallToolAsync("set_budget_actual", Arguments(month, new JsonObject { ["budgetId"] = budgetId, ["actualAmount"] = null })))["isError"]);
+            Assert.NotEqual(true, (bool?)(await _mcp.CallToolAsync("set_line_actual", Arguments(month, new JsonObject { ["lineId"] = lineId, ["status"] = "AsPlanned" })))["isError"]);
         }
+    }
+
+    [Fact]
+    public async Task SetLineActual_OnAQuarterlyLineDueThisMonth_IsAccepted()
+    {
+        // The car insurance of the demo is quarterly, due in March: a line of the month like a monthly one.
+        const string month = "2032-03";
+        var insurance = (await SummaryAsync(month))["lines"]!.AsArray().Single(l => (string?)l!["name"] == "Assurance auto")!;
+
+        var corrected = await CallAsync("set_line_actual", month, new JsonObject { ["lineId"] = (string)insurance["id"]!, ["status"] = "Corrected", ["actualAmount"] = 170m });
+
+        Assert.Equal((170m, "Corrected"), LineFigures(corrected, (string)insurance["id"]!));
     }
 
     public static TheoryData<string, string, string> InvalidCalls => new()
@@ -130,6 +142,8 @@ public class ActualsInputToolsEndpointTests(McpServerFixture mcp)
         { "set_line_actual", """{ "month": "2032-05", "lineId": "LINE", "status": "Skipped", "actualAmount": 10 }""", "for a Corrected line only" },
         { "set_line_actual", """{ "month": "2032-05", "lineId": "LINE", "status": "AsPlanned", "actualAmount": 10 }""", "for a Corrected line only" },
         { "set_line_actual", """{ "month": "2032-05", "lineId": "NOT_DUE", "status": "Skipped" }""", "No recurring line with this identifier is due in 2032-05." },
+        { "set_line_actual", """{ "month": "2032-05", "lineId": "NOT_DUE", "status": "Corrected", "actualAmount": 10 }""", "No recurring line with this identifier is due in 2032-05." },
+        { "set_line_actual", """{ "month": "2032-05", "lineId": "NOT_DUE", "status": "AsPlanned" }""", "No recurring line with this identifier is due in 2032-05." },
         { "set_line_actual", """{ "month": "2032-05", "lineId": "BUDGET", "status": "AsPlanned" }""", "No recurring line with this identifier is due in 2032-05." },
         { "set_line_actual", """{ "month": "2032-05", "lineId": "LINE", "status": 7 }""", "Unknown status" },
         { "set_line_actual", """{ "month": "2032-05", "lineId": "LINE", "status": "Paid" }""", "An error occurred invoking 'set_line_actual'." },
@@ -142,10 +156,15 @@ public class ActualsInputToolsEndpointTests(McpServerFixture mcp)
         var summary = await SummaryAsync("2032-05");
         var lines = (await _mcp.CallToolAsync("list_recurring_lines", Month("2032-05")))["structuredContent"]!["lines"]!.AsArray();
         var notDue = lines.First(l => l!["dueDate"] is null)!;
+        var budgetId = (string)summary["budgets"]![0]!["id"]!;
+        var lineId = (string)summary["lines"]![0]!["id"]!;
         var json = arguments
             .Replace("NOT_DUE", (string)notDue["id"]!)
-            .Replace("BUDGET", (string)summary["budgets"]![0]!["id"]!)
-            .Replace("LINE", (string)summary["lines"]![0]!["id"]!);
+            .Replace("BUDGET", budgetId)
+            .Replace("LINE", lineId);
+        // Something to lose: a refused call that would clear before refusing shows in the snapshot too.
+        await CallAsync("set_budget_actual", "2032-05", new JsonObject { ["budgetId"] = budgetId, ["actualAmount"] = 50 });
+        await CallAsync("set_line_actual", "2032-05", new JsonObject { ["lineId"] = lineId, ["status"] = "Skipped" });
         var before = await WrittenRows.SnapshotAsync(mcp);
 
         var result = await _mcp.CallToolAsync(tool, JsonNode.Parse(json)!.AsObject());

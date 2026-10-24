@@ -219,26 +219,67 @@ describe("actuals of the month", () => {
 describe("actuals saved through startView", () => {
   afterEach(() => { vi.unstubAllGlobals(); });
 
-  it("redraws the month from the figures of the server, the focus back on the same row", async () => {
-    vi.stubGlobal("ResizeObserver", ManualResizeObserver);
-    const page = pageSkeleton();
-    const app = fakeApp();
-    const groceries = demoMonth.budgets[1]!;
-    const saved = { ...demoMonth, budgets: demoMonth.budgets.map(b => b.id === groceries.id ? { ...b, actual: 347.85, entered: true } : b) };
-    app.callServerTool.mockResolvedValue(toolResult({ structuredContent: { ...saved } }));
-    await startView(monthOverview, asHostApp(app));
-    app.sendResult(toolResult({ structuredContent: { ...demoMonth } }));
-    const row = () => page.querySelectorAll(".budgets tbody tr")[1]!;
-    [...row().querySelectorAll("button")].find(b => b.textContent === "Modifier")!.click();
-    row().querySelector("input")!.value = "347,85";
+  const groceries = demoMonth.budgets[1]!;
+  const transport = demoMonth.lines[0]!;
+  const button = (row: Element, name: string) => [...row.querySelectorAll("button")].find(b => b.textContent === name)!;
 
-    [...row().querySelectorAll("button")].find(b => b.textContent === "Enregistrer")!.click();
+  /** The month shown through startView, the server answering every input with the given month. */
+  async function shown(page: () => HTMLElement, answer: MonthSummaryOutput, first: MonthSummaryOutput = demoMonth) {
+    vi.stubGlobal("ResizeObserver", ManualResizeObserver);
+    page();
+    const app = fakeApp();
+    app.callServerTool.mockResolvedValue(toolResult({ structuredContent: { ...answer } }));
+    await startView(monthOverview, asHostApp(app));
+    app.sendResult(toolResult({ structuredContent: { ...first } }));
+    return app;
+  }
+
+  it("redraws the month from the figures of the server, the focus back on the same row", async () => {
+    const page = pageSkeleton();
+    // The server answers with its own figure, not the one typed: the view shows the server's.
+    const saved = { ...demoMonth, budgets: demoMonth.budgets.map(b => b.id === groceries.id ? { ...b, actual: 347.85, entered: true } : b) };
+    const app = await shown(() => page, saved);
+    const row = () => page.querySelectorAll(".budgets tbody tr")[1]!;
+    button(row(), "Modifier").click();
+    row().querySelector("input")!.value = "300";
+
+    button(row(), "Enregistrer").click();
 
     await vi.waitFor(() => { expect(row().querySelector("input")).toBeNull(); });
     expect(app.callServerTool).toHaveBeenCalledWith({
-      name: "set_budget_actual", arguments: { month: "2027-03", budgetId: groceries.id, actualAmount: 347.85 },
+      name: "set_budget_actual", arguments: { month: "2027-03", budgetId: groceries.id, actualAmount: 300 },
     });
     expect(plain(row().querySelectorAll("td")[2]?.textContent)).toBe(euros(347.85));
+    expect(document.activeElement).toBe(row().querySelector(".edit"));
+  });
+
+  it("puts the focus back on the row after Comme prévu too", async () => {
+    const page = pageSkeleton();
+    const entered = { ...demoMonth, budgets: demoMonth.budgets.map(b => b.id === groceries.id ? { ...b, actual: 347.85, entered: true } : b) };
+    const app = await shown(() => page, demoMonth, entered);
+    const row = () => page.querySelectorAll(".budgets tbody tr")[1]!;
+    button(row(), "Modifier").click();
+
+    button(row(), "Comme prévu").click();
+
+    await vi.waitFor(() => { expect(row().querySelector("input")).toBeNull(); });
+    expect(app.callServerTool).toHaveBeenCalledWith({
+      name: "set_budget_actual", arguments: { month: "2027-03", budgetId: groceries.id, actualAmount: null },
+    });
+    expect(document.activeElement).toBe(row().querySelector(".edit"));
+  });
+
+  it("puts the focus back on the same row of the lines table", async () => {
+    const page = pageSkeleton();
+    const corrected = { ...demoMonth, lines: demoMonth.lines.map(l => l.id === transport.id ? { ...l, actual: 90, status: "Corrected" as const } : l) };
+    await shown(() => page, corrected);
+    const row = () => page.querySelectorAll(".lines tbody tr")[0]!;
+    button(row(), "Modifier").click();
+    row().querySelector("input")!.value = "90";
+
+    button(row(), "Enregistrer").click();
+
+    await vi.waitFor(() => { expect(row().querySelector("input")).toBeNull(); });
     expect(document.activeElement).toBe(row().querySelector(".edit"));
   });
 });

@@ -13,7 +13,7 @@ internal static class WrittenRows
 {
     public static async Task<string> SnapshotAsync(McpServerFixture mcp)
     {
-        using var scope = mcp.Server.Services.CreateScope();
+        await using var scope = mcp.Server.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
         var token = TestContext.Current.CancellationToken;
 

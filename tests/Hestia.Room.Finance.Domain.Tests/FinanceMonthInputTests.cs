@@ -9,18 +9,21 @@ namespace Hestia.Room.Finance.Domain.Tests;
 public class FinanceMonthInputTests
 {
     private readonly RecurringLine _rent = Expense("Rent", 650m, day: 5);
+    // Quarterly from April: due in April, as much as a monthly line.
+    private readonly RecurringLine _carInsurance = new(Guid.NewGuid(), FlowKind.Expense, "Car insurance", 165m,
+        Frequency.Quarterly, dayOfMonth: 15, LongAgo, anchorMonth: 4);
     // Yearly in March: running in April, but not due.
     private readonly RecurringLine _insurance = YearlyExpense("Home insurance", 360m, day: 10, anchorMonth: 3);
     // Ended in March: not running in April.
     private readonly RecurringLine _gym = Expense("Gym", 30m, day: 3, end: new DateOnly(2026, 3, 31));
     private readonly Budget _groceries = NewBudget("Groceries", 200m);
 
-    private FinanceMonth April2026 => new(new MonthPlan(April), [_rent, _insurance, _gym], [_groceries], [], []);
+    private FinanceMonth April2026 => new(new MonthPlan(April), [_rent, _carInsurance, _insurance, _gym], [_groceries], [], []);
 
     [Fact]
     public void Occurrences_AreTheLinesDueThisMonth()
     {
-        Assert.Equal([_rent], April2026.Occurrences.Select(o => o.Line));
+        Assert.Equal([_rent, _carInsurance], April2026.Occurrences.Select(o => o.Line));
     }
 
     [Fact]
@@ -56,6 +59,14 @@ public class FinanceMonthInputTests
     public void SkippedFor_ALineDueThisMonth_IsASkippedOverride()
     {
         Assert.Equal(RecurringOverride.Skipped(_rent.Id, April), April2026.SkippedFor(_rent.Id));
+    }
+
+    [Fact]
+    public void CorrectionAndSkipped_ForAQuarterlyLineDueThisMonth_AreAccepted()
+    {
+        Assert.Equal(RecurringOverride.WithAmount(_carInsurance.Id, April, 170m), April2026.CorrectionFor(_carInsurance.Id, 170m));
+        Assert.Equal(RecurringOverride.Skipped(_carInsurance.Id, April), April2026.SkippedFor(_carInsurance.Id));
+        April2026.EnsureLineDue(_carInsurance.Id);
     }
 
     public static TheoryData<string> LinesNotDue => ["insurance (yearly, due in March)", "gym (ended in March)", "unknown"];

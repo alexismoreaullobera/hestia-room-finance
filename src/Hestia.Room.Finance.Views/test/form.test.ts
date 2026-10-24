@@ -100,6 +100,47 @@ describe("amountForm", () => {
     expect(cancel).toHaveBeenCalledTimes(2);
   });
 
+  it("ignores Escape while a call is pending, since the save would still land", () => {
+    const cancel = vi.fn<AmountFormOptions["cancel"]>();
+    open({ cancel, submit: pending });
+    buttonNamed("Enregistrer").click();
+
+    field().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
+  it("accepts Escape again once a call is refused", async () => {
+    const cancel = vi.fn<AmountFormOptions["cancel"]>();
+    open({ cancel, submit: () => Promise.resolve(false) });
+    buttonNamed("Enregistrer").click();
+    await vi.waitFor(() => { expect(field().disabled).toBe(false); });
+
+    field().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("calls afterShown once a result is shown, by Enregistrer or another action, never on a refusal", async () => {
+    const afterShown = vi.fn<() => void>();
+    let shown = true;
+    open({ afterShown, submit: () => Promise.resolve(shown), actions: [{ label: "Comme prévu", run: () => Promise.resolve(shown) }] });
+
+    buttonNamed("Enregistrer").click();
+    await vi.waitFor(() => { expect(afterShown).toHaveBeenCalledOnce(); });
+
+    // A new form, as after the redraw: the other action, then a refusal.
+    open({ afterShown, submit: () => Promise.resolve(shown), actions: [{ label: "Comme prévu", run: () => Promise.resolve(shown) }] });
+    buttonNamed("Comme prévu").click();
+    await vi.waitFor(() => { expect(afterShown).toHaveBeenCalledTimes(2); });
+
+    shown = false;
+    open({ afterShown, submit: () => Promise.resolve(shown) });
+    buttonNamed("Enregistrer").click();
+    await vi.waitFor(() => { expect(field().disabled).toBe(false); });
+    expect(afterShown).toHaveBeenCalledTimes(2);
+  });
+
   it("focuses the field with its text selected", () => {
     open();
 

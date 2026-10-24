@@ -1,5 +1,6 @@
 using Hestia.Room.Finance.Domain;
 using Hestia.Room.Finance.Infrastructure.Rows;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using static Hestia.Room.Finance.Infrastructure.Tests.InfraTestData;
 
@@ -130,6 +131,22 @@ public class FinancePlanWriterActualsTests(SqlServerFixture sqlServer)
         await WriteAsync(racing, w => w.SetLineOverrideAsync(RecurringOverride.Skipped(_water.Id, April), Token));
 
         Assert.Equal([RecurringOverride.Skipped(_water.Id, April)], (await LoadAsync(options, April)).Overrides);
+    }
+
+    [Fact]
+    public async Task SetActuals_ForABudgetOrALineDeletedMeanwhile_FailWithTheForeignKey_NeverRetried()
+    {
+        // Deleted between the read of the month and the write: the database refuses (547), and the writer does not take
+        // it for a race of two first saves (only a duplicate key is).
+        var options = await SeedAsync();
+
+        var budgetError = await Assert.ThrowsAsync<DbUpdateException>(() =>
+            WriteAsync(options, w => w.SetBudgetActualAsync(new BudgetActual(Guid.CreateVersion7(), April, 10m), Token)));
+        var lineError = await Assert.ThrowsAsync<DbUpdateException>(() =>
+            WriteAsync(options, w => w.SetLineOverrideAsync(RecurringOverride.Skipped(Guid.CreateVersion7(), April), Token)));
+
+        Assert.Equal(547, Assert.IsType<SqlException>(budgetError.InnerException).Number);
+        Assert.Equal(547, Assert.IsType<SqlException>(lineError.InnerException).Number);
     }
 
     private async Task<DbContextOptions<FinanceDbContext>> SeedAsync()
