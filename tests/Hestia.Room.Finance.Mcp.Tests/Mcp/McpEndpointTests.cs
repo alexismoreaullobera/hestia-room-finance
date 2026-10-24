@@ -33,6 +33,7 @@ public partial class McpEndpointTests(McpServerFixture mcp)
     private static readonly Dictionary<string, string[]> InputToolsOfViews = new()
     {
         ["ui://finance/cash-flow-forecast.html"] = ["set_starting_balance"],
+        ["ui://finance/month-overview.html"] = ["set_budget_actual", "set_line_actual"],
     };
 
     public static TheoryData<string, string, string> ViewToolsViewsAndTitles =>

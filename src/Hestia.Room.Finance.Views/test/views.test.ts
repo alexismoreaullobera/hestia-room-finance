@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewContext } from "../src/shared/view";
 import { cashFlowForecast, chart, MIN_WIDTH } from "../src/cash-flow-forecast";
-import { monthOverview } from "../src/month-overview";
-import type { CashFlowForecastOutput, MonthSummaryOutput, SubscriptionOutput, SubscriptionsOutput } from "../src/shared/outputs";
+import { monthOverview, SET_BUDGET_ACTUAL, SET_LINE_ACTUAL } from "../src/month-overview";
+import type {
+  BudgetActualOutput, CashFlowForecastOutput, LineActualOutput, MonthSummaryOutput, SubscriptionOutput, SubscriptionsOutput,
+} from "../src/shared/outputs";
 import { formatEuros } from "../src/shared/format";
 import { subscriptions } from "../src/subscriptions";
 import forecastFixture from "./fixtures/cash-flow-forecast.json";
@@ -25,8 +27,8 @@ beforeEach(() => {
 });
 
 const texts = (selector: string) => [...content.querySelectorAll(selector)].map(node => plain(node.textContent));
-/** Every row of the table body, every cell as the texts of its parts (a value and its detail, for instance). */
-const rows = () => [...content.querySelectorAll("tbody tr")]
+/** Every row of a table body (all tables by default), every cell as the texts of its parts (a value and its detail). */
+const rows = (table = "") => [...content.querySelectorAll(`${table} tbody tr`)]
   .map(row => [...row.children].map(cell => [...cell.childNodes].map(part => plain(part.textContent))));
 const euros = (value: number) => plain(formatEuros(value));
 
@@ -62,14 +64,182 @@ describe("month overview", () => {
   it("shows the figures side by side, planned then actual", () => {
     monthOverview.render({ ...demoMonth, actual }, content, at(640));
 
-    expect(rows()).toEqual([
+    expect(rows(".totals")).toEqual([
       [["Entrées"], [euros(planned.incomes)], [euros(2300)]],
       [["Dépenses récurrentes"], [euros(planned.recurringExpenses)], [euros(1300.5)]],
       [["Budgets"], [euros(planned.budgets)], [euros(480.25)]],
       [["Capacité d'épargne"], [euros(planned.savingsCapacity)], [euros(519.25)]],
     ]);
-    expect(content.querySelector("tbody tr:last-child")?.className).toBe("total");
+    expect(content.querySelector(".totals tbody tr:last-child")?.className).toBe("total");
     expect(content.querySelector(".note")).not.toBeNull();
+  });
+});
+
+describe("actuals of the month", () => {
+  // The demo month with one budget entered and two lines that went otherwise: every state of a row.
+  const [fuel, groceries, outings] = demoMonth.budgets as [BudgetActualOutput, BudgetActualOutput, BudgetActualOutput];
+  const [transport, gym, rent] = demoMonth.lines as [LineActualOutput, LineActualOutput, LineActualOutput];
+  const salary = demoMonth.lines.find(line => line.kind === "Income")!;
+  const month: MonthSummaryOutput = {
+    ...demoMonth,
+    budgets: [fuel, { ...groceries, actual: 347.85, entered: true }, outings],
+    lines: demoMonth.lines.map(line =>
+      line.id === gym.id ? { ...line, actual: 0, status: "Skipped" as const }
+        : line.id === rent.id ? { ...line, actual: 735.5, status: "Corrected" as const }
+          : line),
+  };
+  const buttonIn = (node: Element | null | undefined, name: string) =>
+    [...(node?.querySelectorAll("button") ?? [])].find(b => b.textContent === name)!;
+  const rowOf = (table: string, index: number) => content.querySelectorAll(`.${table} tbody tr`)[index]!;
+
+  /** A fresh rendering, as startView does after each result (it empties the content first). */
+  function render(call = vi.fn<ViewContext["call"]>(() => new Promise(() => {}))) {
+    content.replaceChildren();
+    monthOverview.render(month, content, at(640, call));
+    return call;
+  }
+
+  it("shows each budget with its actual, or as planned when none was entered", () => {
+    render();
+
+    expect(content.querySelector(".budgets")?.previousElementSibling?.textContent).toBe("Budgets");
+    expect(rows(".budgets").map(cells => cells.slice(0, 3))).toEqual([
+      [["Carburant"], [euros(90)], ["comme prévu"]],
+      [["Courses"], [euros(320)], [euros(347.85)]],
+      [["Sorties"], [euros(120)], ["comme prévu"]],
+    ]);
+  });
+
+  it("shows each line due with what happened, an income marked as such", () => {
+    render();
+
+    expect(rows(".lines")[0]).toEqual([["01/03"], ["Abonnement transports"], [euros(transport.planned)], ["comme prévu"], ["Modifier"]]);
+    expect(rows(".lines")[1]).toEqual([["03/03"], ["Salle de sport"], [euros(gym.planned)], [euros(0), "n'a pas eu lieu"], ["Modifier"]]);
+    expect(rows(".lines")[2]).toEqual([["05/03"], ["Loyer"], [euros(720)], [euros(735.5), "corrigé"], ["Modifier"]]);
+    const salaryRow = rows(".lines")[demoMonth.lines.indexOf(salary)];
+    expect(salaryRow?.[1]).toEqual(["Salaire", "entrée"]);
+    // A line that did not happen stands out (in red), a correction stays neutral.
+    expect(rowOf("lines", 1).querySelector(".badge")?.className).toBe("badge skipped");
+    expect(rowOf("lines", 2).querySelector(".badge")?.className).toBe("badge corrected");
+  });
+
+  it("shows no table without budgets nor lines", () => {
+    monthOverview.render({ ...month, budgets: [], lines: [] }, content, at(640));
+
+    expect(content.querySelector(".budgets")).toBeNull();
+    expect(content.querySelector(".lines")).toBeNull();
+    expect([...content.querySelectorAll("h2")]).toEqual([]);
+  });
+
+  it("turns a budget row into the form, on the whole width, prefilled and named", () => {
+    render();
+
+    buttonIn(rowOf("budgets", 1), "Modifier").click();
+
+    const row = rowOf("budgets", 1);
+    expect(row.classList.contains("editing")).toBe(true);
+    expect(row.querySelector("td")?.colSpan).toBe(4);
+    expect(plain(row.querySelector("input")?.value)).toBe("347,85");
+    expect(row.querySelector("input")?.getAttribute("aria-label")).toBe("Réel de Courses en Mars 2027");
+    expect(document.activeElement).toBe(row.querySelector("input"));
+  });
+
+  it("saves the total of a budget, or goes back to the plan", () => {
+    const call = render();
+    buttonIn(rowOf("budgets", 1), "Modifier").click();
+    rowOf("budgets", 1).querySelector("input")!.value = "300";
+
+    buttonIn(rowOf("budgets", 1), "Enregistrer").click();
+    expect(call).toHaveBeenLastCalledWith(SET_BUDGET_ACTUAL, { month: "2027-03", budgetId: groceries.id, actualAmount: 300 });
+
+    render(call);
+    buttonIn(rowOf("budgets", 1), "Modifier").click();
+    buttonIn(rowOf("budgets", 1), "Comme prévu").click();
+    expect(call).toHaveBeenLastCalledWith(SET_BUDGET_ACTUAL, { month: "2027-03", budgetId: groceries.id, actualAmount: null });
+  });
+
+  it("offers Comme prévu only for a budget entered", () => {
+    render();
+
+    buttonIn(rowOf("budgets", 0), "Modifier").click();
+
+    expect([...rowOf("budgets", 0).querySelectorAll("button")].map(b => b.textContent)).toEqual(["Enregistrer", "Annuler"]);
+  });
+
+  it("corrects a line, marks it as not happened, or goes back to the plan", () => {
+    const call = render();
+    buttonIn(rowOf("lines", 0), "Modifier").click();
+    rowOf("lines", 0).querySelector("input")!.value = "90";
+
+    buttonIn(rowOf("lines", 0), "Enregistrer").click();
+    expect(call).toHaveBeenLastCalledWith(SET_LINE_ACTUAL, { month: "2027-03", lineId: transport.id, status: "Corrected", actualAmount: 90 });
+
+    render(call);
+    buttonIn(rowOf("lines", 0), "Modifier").click();
+    buttonIn(rowOf("lines", 0), "N'a pas eu lieu").click();
+    expect(call).toHaveBeenLastCalledWith(SET_LINE_ACTUAL, { month: "2027-03", lineId: transport.id, status: "Skipped" });
+
+    render(call);
+    buttonIn(rowOf("lines", 2), "Modifier").click();
+    buttonIn(rowOf("lines", 2), "Comme prévu").click();
+    expect(call).toHaveBeenLastCalledWith(SET_LINE_ACTUAL, { month: "2027-03", lineId: rent.id, status: "AsPlanned" });
+  });
+
+  it.each([
+    ["as planned", 0, ["Enregistrer", "N'a pas eu lieu", "Annuler"], "86,40"],
+    ["skipped, prefilled with the plan", 1, ["Enregistrer", "Comme prévu", "Annuler"], "34,90"],
+    ["corrected", 2, ["Enregistrer", "N'a pas eu lieu", "Comme prévu", "Annuler"], "735,50"],
+  ])("offers the actions that change a line %s", (_, index, buttons, prefilled) => {
+    render();
+
+    buttonIn(rowOf("lines", index), "Modifier").click();
+
+    expect([...rowOf("lines", index).querySelectorAll("button")].map(b => b.textContent)).toEqual(buttons);
+    expect(plain(rowOf("lines", index).querySelector("input")?.value)).toBe(prefilled);
+    expect(rowOf("lines", index).querySelector("td")?.colSpan).toBe(5);
+  });
+
+  it("gives the row back on Annuler and on Escape, the focus on its button", () => {
+    const call = render();
+    buttonIn(rowOf("lines", 2), "Modifier").click();
+    buttonIn(rowOf("lines", 2), "Annuler").click();
+
+    expect(rowOf("lines", 2).classList.contains("editing")).toBe(false);
+    expect(document.activeElement).toBe(buttonIn(rowOf("lines", 2), "Modifier"));
+
+    buttonIn(rowOf("budgets", 1), "Modifier").click();
+    rowOf("budgets", 1).querySelector("input")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+    expect(rowOf("budgets", 1).querySelector("input")).toBeNull();
+    expect(document.activeElement).toBe(buttonIn(rowOf("budgets", 1), "Modifier"));
+    expect(call).not.toHaveBeenCalled();
+  });
+});
+
+describe("actuals saved through startView", () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("redraws the month from the figures of the server, the focus back on the same row", async () => {
+    vi.stubGlobal("ResizeObserver", ManualResizeObserver);
+    const page = pageSkeleton();
+    const app = fakeApp();
+    const groceries = demoMonth.budgets[1]!;
+    const saved = { ...demoMonth, budgets: demoMonth.budgets.map(b => b.id === groceries.id ? { ...b, actual: 347.85, entered: true } : b) };
+    app.callServerTool.mockResolvedValue(toolResult({ structuredContent: { ...saved } }));
+    await startView(monthOverview, asHostApp(app));
+    app.sendResult(toolResult({ structuredContent: { ...demoMonth } }));
+    const row = () => page.querySelectorAll(".budgets tbody tr")[1]!;
+    [...row().querySelectorAll("button")].find(b => b.textContent === "Modifier")!.click();
+    row().querySelector("input")!.value = "347,85";
+
+    [...row().querySelectorAll("button")].find(b => b.textContent === "Enregistrer")!.click();
+
+    await vi.waitFor(() => { expect(row().querySelector("input")).toBeNull(); });
+    expect(app.callServerTool).toHaveBeenCalledWith({
+      name: "set_budget_actual", arguments: { month: "2027-03", budgetId: groceries.id, actualAmount: 347.85 },
+    });
+    expect(plain(row().querySelectorAll("td")[2]?.textContent)).toBe(euros(347.85));
+    expect(document.activeElement).toBe(row().querySelector(".edit"));
   });
 });
 
