@@ -13,10 +13,11 @@ public static class FinanceInfrastructure
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
         // Scoped (the default of AddDbContext): one context per dependency injection scope, which a web host creates
-        // per request, never shared between two scopes since a DbContext is not thread-safe. The reader and the seeder
-        // use it, so they are scoped too.
+        // per request, never shared between two scopes since a DbContext is not thread-safe. The reader, the writer and
+        // the seeder use it, so they are scoped too.
         services.AddDbContext<FinanceDbContext>(options => options.UseRoomSqlServer(connectionString));
         services.AddScoped<FinancePlanReader>();
+        services.AddScoped<FinancePlanWriter>();
         services.AddScoped<DemoDataSeeder>();
         return services;
     }

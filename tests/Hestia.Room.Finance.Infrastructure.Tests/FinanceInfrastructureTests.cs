@@ -13,12 +13,15 @@ public class FinanceInfrastructureTests
     private static readonly ServiceProviderOptions Strict = new() { ValidateScopes = true, ValidateOnBuild = true };
 
     [Fact]
-    public void AddFinanceInfrastructure_RegistersTheReaderAndTheSeeder()
+    public void AddFinanceInfrastructure_RegistersTheReaderTheWriterAndTheSeeder()
     {
         using var provider = new ServiceCollection().AddFinanceInfrastructure("Server=offline").BuildServiceProvider(Strict);
         using var scope = provider.CreateScope();
 
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<FinancePlanReader>());
+        Assert.NotNull(scope.ServiceProvider.GetRequiredService<FinancePlanWriter>());
+        // Scoped like the context it uses: never resolved from the root.
+        Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<FinancePlanWriter>());
         Assert.NotNull(scope.ServiceProvider.GetRequiredService<DemoDataSeeder>());
     }
 
