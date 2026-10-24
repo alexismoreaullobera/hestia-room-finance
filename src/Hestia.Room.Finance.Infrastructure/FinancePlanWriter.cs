@@ -7,9 +7,11 @@ namespace Hestia.Room.Finance.Infrastructure;
 
 /// <summary>
 /// Saves the inputs of the user, one use case per method: the counterpart of <see cref="FinancePlanReader"/>, not a
-/// generic CRUD layer over each table. Every method takes domain objects, so a value reaching the database has passed
-/// the domain rules (cents, bounds, a budget of the month, a line due); the database constraints are a further check.
-/// The last save wins: the room has a single user.
+/// generic CRUD layer over each table. The values come as domain objects, so they have passed the rules of their type
+/// (cents, bounds); whether a budget belongs to the month or a line is due that month is checked by the caller through
+/// <see cref="FinanceMonth"/>, before any write, clears included. The database constraints are a further check.
+/// The last save wins: the room has a single user. Two first saves of the same key end with the last value; a save
+/// meeting a concurrent clear, or a budget or line deleted meanwhile, fails with the database error instead.
 /// </summary>
 public sealed class FinancePlanWriter(FinanceDbContext context)
 {
@@ -87,8 +89,9 @@ public sealed class FinancePlanWriter(FinanceDbContext context)
         }
         catch (DbUpdateException error) when (error.InnerException is SqlException { Number: 2627 or 2601 })
         {
-            // Another first save of this key inserted its row in between: this one applies on top of it.
-            context.ChangeTracker.Clear();
+            // Another first save of this key inserted its row in between: this one applies on top of it. Only the row
+            // added here is detached, never what the caller tracks in the same context.
+            context.Entry(newRow).State = EntityState.Detached;
             var inserted = await rows.FindAsync(key, cancellationToken)
                 ?? throw new InvalidOperationException("A row was inserted by another save, then deleted.", error);
             await ReplaceAsync(inserted, newRow, cancellationToken);

@@ -1,5 +1,5 @@
 // The amount form of the views: a field, Enregistrer, optional other actions (such as "Comme prévu"), Annuler. Built
-// with the DOM kit; every input of the room goes through it, so they all behave the same way.
+// with the DOM kit; every amount the user types goes through it, so they all behave the same way.
 import { element } from "./dom";
 import { formatAmount, parseEuros } from "./format";
 import "./form.css";
@@ -23,6 +23,11 @@ export interface AmountFormOptions {
   /** Closes the form without saving (Annuler, Escape). */
   cancel: () => void;
   actions?: readonly FormAction[];
+  /**
+   * Called once a result is shown (the view redrawn, this form with it): typically puts the focus back on the button
+   * that opened the form, in the new rendering.
+   */
+  afterShown?: () => void;
 }
 
 export interface AmountForm {
@@ -36,7 +41,7 @@ export interface AmountForm {
  * (a double click never sends twice). A result shown redraws the view, this form with it; otherwise (refused, failed,
  * overtaken by a newer result) the form is enabled again with what was typed, the status of the view saying why.
  */
-export function amountForm({ title, label, value, submit, cancel, actions = [] }: AmountFormOptions): AmountForm {
+export function amountForm({ title, label, value, submit, cancel, actions = [], afterShown }: AmountFormOptions): AmountForm {
   const field = element("input", { attributes: { type: "text", inputmode: "decimal", autocomplete: "off", "aria-label": label } });
   field.value = formatAmount(value);
   const save = element("button", { attributes: { type: "submit" } }, "Enregistrer");
@@ -54,15 +59,22 @@ export function amountForm({ title, label, value, submit, cancel, actions = [] }
     element("div", { className: "actions" }, save, ...others, cancelButton),
     problem);
 
-  function setBusy(busy: boolean): void {
-    for (const control of controls) control.disabled = busy;
+  // While a call is pending: every control disabled, and Escape ignored too (it would close the form while the save
+  // still lands, then the view would redraw with the saved value).
+  let busy = false;
+  function setBusy(value: boolean): void {
+    busy = value;
+    for (const control of controls) control.disabled = value;
   }
 
   function send(call: () => Promise<boolean>): void {
     problem.textContent = "";
     setBusy(true);
     void call().then((shown) => {
-      if (shown) return;
+      if (shown) {
+        afterShown?.();
+        return;
+      }
       setBusy(false);
       field.focus();
     });
@@ -81,7 +93,7 @@ export function amountForm({ title, label, value, submit, cancel, actions = [] }
   });
   cancelButton.addEventListener("click", cancel);
   form.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") cancel();
+    if (event.key === "Escape" && !busy) cancel();
   });
 
   return {

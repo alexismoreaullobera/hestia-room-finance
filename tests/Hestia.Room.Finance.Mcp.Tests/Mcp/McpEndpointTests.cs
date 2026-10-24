@@ -2,7 +2,7 @@ using System.Net;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Hestia.Room.Finance.Domain;
-using Hestia.Room.Finance.Mcp.Tools.Outputs;
+using Hestia.Room.Finance.Mcp.Tools;
 using Hestia.Room.Finance.Mcp.Views;
 
 namespace Hestia.Room.Finance.Mcp.Tests.Mcp;

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Hestia.Room.Finance.Domain;
+using Hestia.Room.Finance.Mcp.Tools;
 using Hestia.Room.Finance.Mcp.Tools.Outputs;
 using static Hestia.Room.Finance.Mcp.Tests.Tools.TestMonth;
 
@@ -121,9 +122,10 @@ public class MonthSummaryOutputTests
 
         var text = output.Describe();
 
-        Assert.Contains($"Réels saisis : Courses {280m.ToString("C", French)} pour {300m.ToString("C", French)} prévus", text);
-        Assert.Contains($"Eau {52m.ToString("C", French)} pour {45m.ToString("C", French)} prévus", text);
-        Assert.Contains("Loyer : n'a pas eu lieu", text);
+        // The names between quotes: a name typed by the user never blends into the sentence the model reads.
+        Assert.Contains($"Réels saisis : « Courses » {280m.ToString("C", French)} pour {300m.ToString("C", French)} prévus", text);
+        Assert.Contains($"« Eau » {52m.ToString("C", French)} pour {45m.ToString("C", French)} prévus", text);
+        Assert.Contains("« Loyer » : n'a pas eu lieu", text);
     }
 
     [Fact]

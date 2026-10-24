@@ -65,7 +65,7 @@ public sealed class FinanceInputTools
         FinancePlanWriter writer,
         FinancePlanReader reader,
         [Description(MonthArgument.RequiredDescription)] string month,
-        [Description("Identifier of a budget of the month, as get_month_summary gives it.")] Guid budgetId,
+        [Description("Identifier of a budget of the month.")] Guid budgetId,
         [Description("Total really spent, in euros with at most two decimals (0 if nothing was spent), or null to go back to "
             + "the planned amount.")] decimal? actualAmount,
         CancellationToken cancellationToken = default)
@@ -109,8 +109,8 @@ public sealed class FinanceInputTools
         FinancePlanWriter writer,
         FinancePlanReader reader,
         [Description(MonthArgument.RequiredDescription)] string month,
-        [Description("Identifier of a recurring line due in the month, as get_month_summary gives it.")] Guid lineId,
-        [Description("AsPlanned, Corrected or Skipped.")] Outputs.LineActualStatus status,
+        [Description("Identifier of a recurring line due in the month.")] Guid lineId,
+        [Description("AsPlanned, Corrected or Skipped.")] LineActualStatus status,
         [Description("The amount that really happened, in euros with at most two decimals: for Corrected only.")]
         decimal? actualAmount = null,
         CancellationToken cancellationToken = default)
@@ -124,19 +124,19 @@ public sealed class FinanceInputTools
         {
             switch (status, actualAmount)
             {
-                case (Outputs.LineActualStatus.Corrected, { } amount):
+                case (LineActualStatus.Corrected, { } amount):
                     var correction = financeMonth.CorrectionFor(lineId, amount);
                     save = () => writer.SetLineOverrideAsync(correction, cancellationToken);
                     break;
-                case (Outputs.LineActualStatus.Corrected, null):
+                case (LineActualStatus.Corrected, null):
                     throw new McpException("A Corrected line needs its actualAmount.");
-                case (Outputs.LineActualStatus.Skipped or Outputs.LineActualStatus.AsPlanned, not null):
+                case (LineActualStatus.Skipped or LineActualStatus.AsPlanned, not null):
                     throw new McpException("actualAmount is for a Corrected line only.");
-                case (Outputs.LineActualStatus.Skipped, null):
+                case (LineActualStatus.Skipped, null):
                     var skipped = financeMonth.SkippedFor(lineId);
                     save = () => writer.SetLineOverrideAsync(skipped, cancellationToken);
                     break;
-                case (Outputs.LineActualStatus.AsPlanned, null):
+                case (LineActualStatus.AsPlanned, null):
                     financeMonth.EnsureLineDue(lineId);
                     save = () => writer.ClearLineOverrideAsync(lineId, yearMonth, cancellationToken);
                     break;

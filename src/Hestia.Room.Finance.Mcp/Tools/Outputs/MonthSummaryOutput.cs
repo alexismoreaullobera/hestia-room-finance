@@ -66,24 +66,7 @@ public sealed record BudgetActualOutput(
         Cents(actual?.Amount ?? budget.PlannedAmount),
         actual is not null);
 
-    internal string Describe() => $"{Name} {Euros(Actual)} pour {Euros(Planned)} prévus";
-}
-
-/// <summary>
-/// What happened to a recurring line due this month. Written and read as text wherever it appears (an output, or the
-/// status argument of set_line_actual), never as a number.
-/// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter<LineActualStatus>))]
-public enum LineActualStatus
-{
-    /// <summary>Paid or received as planned: nothing entered.</summary>
-    AsPlanned,
-
-    /// <summary>Happened with another amount.</summary>
-    Corrected,
-
-    /// <summary>Did not happen this month.</summary>
-    Skipped,
+    internal string Describe() => $"« {Name} » {Euros(Actual)} pour {Euros(Planned)} prévus";
 }
 
 /// <remarks>Enums as text, by explicit converters (see <see cref="RecurringLineOutput"/>).</remarks>
@@ -103,15 +86,16 @@ public sealed record LineActualOutput(
         var (status, actual) = lineOverride switch
         {
             null => (LineActualStatus.AsPlanned, line.Amount),
-            { IsSkipped: true } => (LineActualStatus.Skipped, 0m),
-            _ => (LineActualStatus.Corrected, lineOverride.ActualAmount!.Value),
+            { ActualAmount: { } amount } => (LineActualStatus.Corrected, amount),
+            _ => (LineActualStatus.Skipped, 0m),
         };
         return new LineActualOutput(line.Id, line.Name, line.Kind, occurrence.Date, Cents(line.Amount), Cents(actual), status);
     }
 
+    // Names between quotes: a name typed by the user, read by the model, stays a name and never blends into the sentence.
     internal string Describe() => Status == LineActualStatus.Skipped
-        ? $"{Name} : n'a pas eu lieu"
-        : $"{Name} {Euros(Actual)} pour {Euros(Planned)} prévus";
+        ? $"« {Name} » : n'a pas eu lieu"
+        : $"« {Name} » {Euros(Actual)} pour {Euros(Planned)} prévus";
 }
 
 /// <summary>

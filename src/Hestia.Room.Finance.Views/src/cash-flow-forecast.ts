@@ -131,13 +131,10 @@ function startingBalanceCard({ month, startingBalance }: CashFlowForecastOutput,
       // The month in the accessible name: a screen reader says which month is changed.
       label: `Solde de départ de ${formatMonth(month)}`,
       value: startingBalance,
-      submit: async (value) => {
-        const shown = await call(SET_STARTING_BALANCE, { month, startingBalance: value });
-        // The view was redrawn from the result, this form with it: the focus goes to the new card's button.
-        if (shown) document.querySelector<HTMLButtonElement>(".starting-balance .edit")?.focus();
-        return shown;
-      },
+      submit: (value) => call(SET_STARTING_BALANCE, { month, startingBalance: value }),
       cancel: () => { showValue(true); },
+      // The view was redrawn from the result, this form with it: the focus goes to the new card's button.
+      afterShown: () => { document.querySelector<HTMLButtonElement>(".starting-balance .edit")?.focus(); },
     });
     node.classList.add("editing");
     node.replaceChildren(form);
