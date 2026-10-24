@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
-import { startView, type ToolResult, type ViewDefinition } from "../src/shared/view";
+import { startView, type ToolResult, type ViewContext, type ViewDefinition } from "../src/shared/view";
 import { asHostApp, fakeApp, ManualResizeObserver, pageSkeleton, setWidth, toolResult } from "./helpers";
 
 interface Data {
@@ -21,7 +21,7 @@ function deferred() {
 
 describe("startView", () => {
   let content: HTMLElement;
-  let render: ReturnType<typeof vi.fn<(data: Data, content: HTMLElement, width: number) => void>>;
+  let render: ReturnType<typeof vi.fn<(data: Data, content: HTMLElement, context: ViewContext) => void>>;
   let view: ViewDefinition<Data>;
   let consoleError: MockInstance<typeof console.error>;
 
@@ -30,7 +30,7 @@ describe("startView", () => {
     vi.stubGlobal("ResizeObserver", ManualResizeObserver);
     consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     content = pageSkeleton();
-    render = vi.fn<(data: Data, content: HTMLElement, width: number) => void>();
+    render = vi.fn<(data: Data, content: HTMLElement, context: ViewContext) => void>();
     view = { name: "Test", tool: "show_test", render };
   });
 
@@ -72,7 +72,7 @@ describe("startView", () => {
     app.sendResult(result("2026-10"));
 
     expect(byId("month").textContent).toBe("Octobre 2026");
-    expect(render).toHaveBeenCalledWith({ month: "2026-10" }, content, 640);
+    expect(render).toHaveBeenCalledWith({ month: "2026-10" }, content, expect.objectContaining({ width: 640 }));
     expect(content.hidden).toBe(false);
     expect(byId("status").hidden).toBe(true);
     expect(button("previous").disabled).toBe(false);
@@ -269,7 +269,87 @@ describe("startView", () => {
     setWidth(content, 480);
     ManualResizeObserver.last!.trigger();
     expect(render).toHaveBeenCalledTimes(2);
-    expect(render).toHaveBeenLastCalledWith({ month: "2026-10" }, content, 480);
+    expect(render).toHaveBeenLastCalledWith({ month: "2026-10" }, content, expect.objectContaining({ width: 480 }));
+  });
+
+  describe("call, for the input tools", () => {
+    /** The call given to the last rendering, as a view uses it from a form. */
+    const lastCall = () => render.mock.lastCall![2].call;
+
+    it("calls the tool, disabling the buttons meanwhile, then renders its result", async () => {
+      const app = fakeApp();
+      const answer = deferred();
+      app.callServerTool.mockReturnValue(answer.promise);
+      await startView(view, asHostApp(app));
+      app.sendResult(result("2026-10"));
+
+      const saved = lastCall()("set_test", { month: "2026-10", value: 12.5 });
+
+      expect(app.callServerTool).toHaveBeenCalledWith({ name: "set_test", arguments: { month: "2026-10", value: 12.5 } });
+      expect(byId("status").textContent).toBe("Enregistrement…");
+      expect(button("previous").disabled).toBe(true);
+      answer.resolve(result("2026-10"));
+      expect(await saved).toBe(true);
+      expect(render).toHaveBeenCalledTimes(2);
+      expect(byId("status").hidden).toBe(true);
+      expect(button("previous").disabled).toBe(false);
+    });
+
+    it("says the value was refused when the tool answers with an error, keeping the rendering", async () => {
+      const app = fakeApp();
+      app.callServerTool.mockResolvedValue(toolResult({ isError: true }));
+      await startView(view, asHostApp(app));
+      app.sendResult(result("2026-10"));
+
+      expect(await lastCall()("set_test", {})).toBe(false);
+
+      expect(byId("status").textContent).toBe("Valeur refusée : vérifiez la saisie.");
+      expect(byId("status").classList.contains("error")).toBe(true);
+      expect(render).toHaveBeenCalledOnce();
+      expect(button("next").disabled).toBe(false);
+    });
+
+    it("says the save failed when the call fails", async () => {
+      const app = fakeApp();
+      app.callServerTool.mockRejectedValue(new Error("network"));
+      await startView(view, asHostApp(app));
+      app.sendResult(result("2026-10"));
+
+      expect(await lastCall()("set_test", {})).toBe(false);
+
+      expect(byId("status").textContent).toBe("Enregistrement impossible, réessayez.");
+      expect(button("next").disabled).toBe(false);
+      expectOneLoggedError();
+    });
+
+    it("makes no call while a navigation is loading", async () => {
+      const app = fakeApp();
+      app.callServerTool.mockReturnValue(deferred().promise);
+      await startView(view, asHostApp(app));
+      app.sendResult(result("2026-10"));
+      const call = lastCall();
+      button("next").click();
+
+      expect(await call("set_test", {})).toBe(false);
+
+      expect(app.callServerTool).toHaveBeenCalledOnce();
+    });
+
+    it("lets a result of the agent win over a save still pending, and ignores its late answer", async () => {
+      const app = fakeApp();
+      const answer = deferred();
+      app.callServerTool.mockReturnValue(answer.promise);
+      await startView(view, asHostApp(app));
+      app.sendResult(result("2026-10"));
+      const saved = lastCall()("set_test", {});
+
+      app.sendResult(result("2027-01"));
+      answer.resolve(result("2026-10"));
+
+      expect(await saved).toBe(false);
+      expect(byId("month").textContent).toBe("Janvier 2027");
+      expect(render).toHaveBeenCalledTimes(2);
+    });
   });
 
   it("does not render on a resize before the first result", async () => {

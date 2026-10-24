@@ -7,7 +7,7 @@ import { subscriptions } from "../src/subscriptions";
 import forecastFixture from "./fixtures/cash-flow-forecast.json";
 import monthFixture from "./fixtures/month-overview.json";
 import subscriptionsFixture from "./fixtures/subscriptions.json";
-import { plain } from "./helpers";
+import { at, plain } from "./helpers";
 
 // The fixtures are the structured content of the view tools on the demo plan, written and checked by a C# test.
 // Typed by annotation, not by assertion: the compiler checks that they match the interfaces. The subscriptions need
@@ -49,7 +49,7 @@ describe("month overview", () => {
   };
 
   it("shows the planned and actual savings capacity, as due this month and on an average month", () => {
-    monthOverview.render({ ...demoMonth, actual }, content, 640);
+    monthOverview.render({ ...demoMonth, actual }, content, at(640));
 
     expect(texts(".card .title")).toEqual(["Capacité d'épargne prévue", "Capacité d'épargne réelle"]);
     expect(texts(".card .big")).toEqual([euros(planned.savingsCapacity), euros(actual.savingsCapacity)]);
@@ -58,7 +58,7 @@ describe("month overview", () => {
   });
 
   it("shows the figures side by side, planned then actual", () => {
-    monthOverview.render({ ...demoMonth, actual }, content, 640);
+    monthOverview.render({ ...demoMonth, actual }, content, at(640));
 
     expect(rows()).toEqual([
       [["Entrées"], [euros(planned.incomes)], [euros(2300)]],
@@ -73,7 +73,7 @@ describe("month overview", () => {
 
 describe("cash flow forecast", () => {
   it("shows the alert with the buffer to start with, the figures, the chart and the debits", () => {
-    cashFlowForecast.render(demoForecast, content, 640);
+    cashFlowForecast.render(demoForecast, content, at(640));
 
     expect(demoForecast.hasAlert).toBe(true);
     expect(plain(content.querySelector(".alert")?.textContent)).toContain(`au moins ${plain(formatEuros(demoForecast.cashBuffer))}`);
@@ -86,7 +86,7 @@ describe("cash flow forecast", () => {
   });
 
   it("says the month starts overdrawn instead of a buffer of 0 €", () => {
-    cashFlowForecast.render({ ...demoForecast, startsOverdrawn: true, cashBuffer: 0 }, content, 640);
+    cashFlowForecast.render({ ...demoForecast, startsOverdrawn: true, cashBuffer: 0 }, content, at(640));
 
     const alert = plain(content.querySelector(".alert")?.textContent);
     expect(alert).toContain("démarre déjà à découvert");
@@ -94,7 +94,7 @@ describe("cash flow forecast", () => {
   });
 
   it("shows a calm note and no debits table when there is no alert and no debit", () => {
-    cashFlowForecast.render({ ...demoForecast, hasAlert: false, contributingDebits: [] }, content, 640);
+    cashFlowForecast.render({ ...demoForecast, hasAlert: false, contributingDebits: [] }, content, at(640));
 
     expect(content.querySelector(".calm")?.textContent).toContain("Pas d'alerte");
     expect(content.querySelector(".alert")).toBeNull();
@@ -105,7 +105,7 @@ describe("cash flow forecast", () => {
     const trap = `<img src=x onerror="alert(1)">`;
     const debit = { name: trap, date: "2027-03-05", amount: 720 };
 
-    cashFlowForecast.render({ ...demoForecast, contributingDebits: [debit] }, content, 640);
+    cashFlowForecast.render({ ...demoForecast, contributingDebits: [debit] }, content, at(640));
 
     expect(content.querySelector("img")).toBeNull();
     expect(texts("tbody tr td:nth-child(2)")).toEqual([trap]);
@@ -161,7 +161,7 @@ describe("chart", () => {
 
 describe("subscriptions", () => {
   it("shows the totals and one row per subscription, in French", () => {
-    subscriptions.render(demoSubscriptions, content, 640);
+    subscriptions.render(demoSubscriptions, content, at(640));
 
     expect(texts(".card .big")).toEqual([
       euros(demoSubscriptions.monthlyTotal), euros(demoSubscriptions.yearlyTotal),
@@ -177,14 +177,14 @@ describe("subscriptions", () => {
       category: "Insurance", monthlyEquivalent: 15, yearlyCost: 180, dueDate: null, commitmentEndDate: null,
     };
 
-    subscriptions.render({ ...demoSubscriptions, subscriptions: [quarterly] }, content, 640);
+    subscriptions.render({ ...demoSubscriptions, subscriptions: [quarterly] }, content, at(640));
 
     expect(rows()).toEqual([
       [["Assurance habitation", "Assurance"], ["45,00 €", "trimestriel"], ["15,00 €"], ["pas ce mois-ci"], ["sans"]]]);
   });
 
   it("says when there is no subscription", () => {
-    subscriptions.render({ ...demoSubscriptions, subscriptions: [] }, content, 640);
+    subscriptions.render({ ...demoSubscriptions, subscriptions: [] }, content, at(640));
 
     expect(content.textContent).toBe("Aucun abonnement en cours ce mois-ci.");
   });
@@ -192,7 +192,7 @@ describe("subscriptions", () => {
   it("says when a subscription is not debited this month", () => {
     const first = { ...demoSubscriptions.subscriptions[0]!, dueDate: null };
 
-    subscriptions.render({ ...demoSubscriptions, subscriptions: [first] }, content, 640);
+    subscriptions.render({ ...demoSubscriptions, subscriptions: [first] }, content, at(640));
 
     expect(texts("tbody tr td:nth-child(4)")).toEqual(["pas ce mois-ci"]);
   });

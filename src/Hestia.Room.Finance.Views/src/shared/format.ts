@@ -38,6 +38,24 @@ export function shiftMonth(month: string, delta: number): string {
   return `${String(Math.floor(index / 12)).padStart(4, "0")}-${String((index % 12) + 1).padStart(2, "0")}`;
 }
 
+// An amount as a user types it: an optional minus (or the minus sign of the French format), whole euros, grouped by
+// thousands with spaces or not, at most two decimals after a comma or a point, an optional euro sign. \s covers the
+// no-break spaces of formatEuros, so a formatted amount reads back.
+const TYPED_AMOUNT = /^([-−])?(\d{1,3}(?:\s\d{3})+|\d+)(?:[.,](\d{1,2}))?(?:\s?€)?$/u;
+
+/**
+ * "1 250,50" -> 1250.5, "-300" -> -300, "12.5 €" -> 12.5; null for anything else (empty, letters, three decimals,
+ * misplaced spaces). The syntax only: the bounds are the server's (a tool error), a single rule for every client.
+ */
+export function parseEuros(text: string): number | null {
+  const match = TYPED_AMOUNT.exec(text.trim());
+  if (match === null) return null;
+  const [, sign, whole = "", cents = "0"] = match;
+  const value = Number(`${whole.replace(/\s/gu, "")}.${cents}`);
+  // No -0: "-0" is 0, written as such in the JSON of the call.
+  return sign !== undefined && value !== 0 ? -value : value;
+}
+
 /** A translation from a table, or the value itself: own keys only, never an inherited one such as "constructor". */
 export function translate(table: Readonly<Record<string, string>>, value: string): string {
   return Object.hasOwn(table, value) ? (table[value] ?? value) : value;

@@ -107,7 +107,7 @@ function debits(contributingDebits: DebitOutput[]): HTMLElement[] {
 export const cashFlowForecast: ViewDefinition<CashFlowForecastOutput> = {
   name: "Prévisionnel de trésorerie",
   tool: "show_cash_flow_forecast",
-  render: (data, content, width) => {
+  render: (data, content, { width }) => {
     content.append(
       summary(data),
       element("div", { className: "cards" },

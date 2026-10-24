@@ -2,12 +2,13 @@
 // through an allowlist; this file is the only one ESLint allows to call setAttribute (see eslint.config.js).
 import { formatEuros } from "./format";
 
-// The only attributes the views may set: presentation and accessibility, never a link (href, src), a style or an
-// event handler (on*), so that no name typed by the user can ever become code or a link. clip-path takes a url(),
-// only a local url(#id) written by the code (never data).
+// The only attributes the views may set: presentation, accessibility and the kind of a form field, never a link
+// (href, src), a form target (action, formaction), a style or an event handler (on*), so that no name typed by the
+// user can ever become code or a link. clip-path takes a url(), only a local url(#id) written by the code (never
+// data). The value of a field is set through its value property, never as an attribute.
 const SAFE_ATTRIBUTES: ReadonlySet<string> = new Set([
-  "role", "aria-label", "id", "class", "viewBox", "x", "y", "x1", "x2", "y1", "y2", "cx", "cy", "r",
-  "width", "height", "points", "text-anchor", "clip-path",
+  "role", "aria-label", "aria-invalid", "id", "class", "viewBox", "x", "y", "x1", "x2", "y1", "y2", "cx", "cy", "r",
+  "width", "height", "points", "text-anchor", "clip-path", "type", "inputmode", "autocomplete",
 ]);
 
 export type Attributes = Readonly<Record<string, string | number>>;
