@@ -2,7 +2,8 @@ namespace Hestia.Room.Finance.Domain;
 
 /// <summary>
 /// The bound of the amounts the user types, public so that the inputs can state it in their messages. Applied to the
-/// starting balance (T9); the other amounts get it when they become inputs (T10, T11).
+/// starting balance, the budget actuals and the corrections of recurring lines; the amounts of the plan itself (lines,
+/// budgets) get it when they become inputs (T11).
 /// </summary>
 public static class AmountLimit
 {

@@ -9,6 +9,7 @@ public sealed record BudgetActual
         // Zero is allowed: nothing was spent on that budget.
         ArgumentOutOfRangeException.ThrowIfNegative(amount);
         Guard.ThrowIfNotCents(amount);
+        Guard.ThrowIfTooLarge(amount);
 
         BudgetId = budgetId;
         Month = month;
