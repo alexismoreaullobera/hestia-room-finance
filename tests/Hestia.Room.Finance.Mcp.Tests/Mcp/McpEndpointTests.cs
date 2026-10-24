@@ -27,7 +27,7 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
     private static readonly string[] DataTools = ["get_month_summary", "get_cash_flow_forecast", "list_recurring_lines", "list_subscriptions"];
 
-    private static readonly string[] InputTools = ["set_starting_balance"];
+    private static readonly string[] InputTools = ["set_starting_balance", "set_budget_actual", "set_line_actual"];
 
     /// <summary>The input tools each view calls from its forms (literals too: renaming one must break the views).</summary>
     private static readonly Dictionary<string, string[]> InputToolsOfViews = new()

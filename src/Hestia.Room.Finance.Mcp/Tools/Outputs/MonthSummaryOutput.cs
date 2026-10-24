@@ -69,7 +69,11 @@ public sealed record BudgetActualOutput(
     internal string Describe() => $"{Name} {Euros(Actual)} pour {Euros(Planned)} prévus";
 }
 
-/// <summary>What happened to a recurring line due this month.</summary>
+/// <summary>
+/// What happened to a recurring line due this month. Written and read as text wherever it appears (an output, or the
+/// status argument of set_line_actual), never as a number.
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter<LineActualStatus>))]
 public enum LineActualStatus
 {
     /// <summary>Paid or received as planned: nothing entered.</summary>
