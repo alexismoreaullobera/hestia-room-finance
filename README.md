@@ -9,7 +9,7 @@ The **personal finance room** of Hestia: plan the incomes and expenses of each m
 
 ![Cash flow forecast view rendered in the MCP Inspector: alert, low point, cash buffer, daily curve and the debits that dig the low point](docs/images/t7-cash-flow-forecast.png)
 
-> **Status: in progress.** The business core, its persistence (SQL Server, EF Core), the four read-only **data tools** and the three **views** (MCP Apps widgets) are done and tested, on a fictitious demo plan. Input (forms) comes next. The v1 features are defined in the [scope](docs/scope.md).
+> **Status: in progress.** The business core, its persistence (SQL Server, EF Core), the four read-only **data tools**, the three **views** (MCP Apps widgets) and the first **input** (the starting balance of the month, edited in place in the cash flow forecast view) are done and tested, on a fictitious demo plan. The other inputs (actuals of the month, then recurring lines, subscriptions and budgets) come next. The v1 features are defined in the [scope](docs/scope.md).
 
 ## Features
 
@@ -19,7 +19,7 @@ The **personal finance room** of Hestia: plan the incomes and expenses of each m
 - **Cash flow forecast**: the expected balance of the account day by day, its **low point**, the **cash buffer** the month needs, an **alert** below zero, and the **contributing debits** (which debit to move).
 - Amounts in euros with cents, every object valid once created.
 
-**Persistence** (`Hestia.Room.Finance.Infrastructure`): SQL Server with EF Core, persistence models separate from the domain, versioned migrations, a reader that loads a month as domain objects, and a fictitious demo plan.
+**Persistence** (`Hestia.Room.Finance.Infrastructure`): SQL Server with EF Core, persistence models separate from the domain, versioned migrations, a reader that loads a month as domain objects, a writer that saves the inputs (domain objects only, so every value has passed the business rules), and a fictitious demo plan.
 
 **MCP server** (`Hestia.Room.Finance.Mcp`): Streamable HTTP (stateless), read-only tools for the agent:
 
@@ -40,7 +40,15 @@ Each tool takes an optional `month` (`YYYY-MM`, the current month in Paris time 
 | `show_cash_flow_forecast` | `ui://finance/cash-flow-forecast.html` | Alert, starting balance, low point, cash buffer, daily curve (hand-made SVG), contributing debits |
 | `show_subscriptions` | `ui://finance/subscriptions.html` | Monthly and yearly totals, each subscription with its debit of the month and its commitment end |
 
-The views follow the host theme (light or dark), change month with their own tool (previous and next buttons, through `callServerTool`, without going through the agent), and never write HTML from data (text only, attributes through an allowlist).
+The views follow the host theme (light or dark), change month with their own tool (previous and next buttons, through `callServerTool`, without going through the agent), and never write HTML from data (text only, attributes through an allowlist). The cash flow forecast view edits the starting balance in place: the forecast is redrawn from the answer of the server.
+
+**Input tools**: the writes of the user, called by the views (the agent has no write access in the v1).
+
+| Input tool | Called by | What it does |
+|---|---|---|
+| `set_starting_balance` | Cash flow forecast view | Saves the starting balance of a month (negative if the account is already overdrawn), then returns the forecast recalculated, exactly as `get_cash_flow_forecast` |
+
+An input tool is declared with the MCP Apps visibility `app`: an MCP Apps host hides it from the model and lets the views call it. A host without MCP Apps support ignores that metadata and offers it to its model like any other tool, so its description also reserves it for the view. Its month is required (a write never falls back on the current month), and a value breaking a rule of the domain (cents, at most 999 999 999,99 € either way) is a tool error, with nothing written.
 
 **Views project** (`Hestia.Room.Finance.Views`): TypeScript built with Vite and `vite-plugin-singlefile` into one self-contained HTML per view, the MCP Apps SDK (`@modelcontextprotocol/ext-apps`) included: no CDN, no third-party code loaded at runtime, and a CSP that declares no domain (no network access from a view; the requests to the host, such as opening a link, remain governed by the host). `dotnet build` builds the views and embeds them in the MCP server.
 
@@ -61,7 +69,7 @@ Hestia.Room.Finance.Domain          business rules and calculations, pure C#: no
 - **Dependencies point inward**: the domain depends on nothing; the infrastructure depends on the domain, never the reverse.
 - **Persistence models are separate from the domain**: EF Core maps plain rows (`Rows/`), converted explicitly to domain objects, so storage constraints never leak into the business rules, and an invalid row is rejected on read.
 - **Calculations are done by the code, never by the LLM**: tools compute, the agent explains.
-- **Thin tools**: a tool loads one month through the reader, then projects it into its output; the reader is injected per HTTP request (scoped, with its DbContext), the clock is a singleton.
+- **Thin tools**: a tool loads one month through the reader, then projects it into its output; an input tool builds the domain object (which checks the value), saves it through the writer, then returns the view data read back. The reader and the writer are injected per HTTP request (scoped, with their DbContext), the clock is a singleton.
 
 ## Quickstart
 
@@ -94,7 +102,7 @@ Hestia.Room.Finance.Domain          business rules and calculations, pure C#: no
    ```bash
    npx @modelcontextprotocol/inspector
    ```
-6. In the Inspector, connect with transport **Streamable HTTP** and URL `http://localhost:5135/mcp`. In the **Apps** tab, open `show_cash_flow_forecast`: the demo shows the alert of the current month; the arrows change month. The **Tools** tab calls the data tools, such as `get_month_summary`.
+6. In the Inspector, connect with transport **Streamable HTTP** and URL `http://localhost:5135/mcp`. In the **Apps** tab, open `show_cash_flow_forecast`: the demo shows the alert of the current month; the arrows change month, and **Modifier** on the starting balance card changes it (try the cash buffer: the alert goes away). The **Tools** tab calls the data tools, such as `get_month_summary`.
 
 `docker compose down` stops the database and keeps the data; `docker compose down -v` deletes it.
 
@@ -130,9 +138,9 @@ npm test
 ```
 
 - **Domain**: every calculation rule of the [scope](docs/scope.md), with business-named tests; sensitive rules checked by mutation.
-- **Infrastructure**: domain ↔ row conversions and the schema checked offline from the EF Core model; then, on a real SQL Server (Testcontainers, one fresh migrated database per test): migrations, round trip of every entity, constraints, cascades, the month reader and the demo seeder.
-- **MCP server**: unit tests of the tool outputs and text summaries on plans built in memory, of the month argument and of the clock (month change in Paris time); then end-to-end tests on the `/mcp` endpoint with an in-memory server, a real SQL Server and a fixed clock: the four data tools (annotations, output schema, figures equal to the domain applied to the demo plan, tool errors), the three view tools (their `ui://` link, a result equal to their data tool, valid and invalid months) and views (MIME type, self-contained: nothing loaded from outside, a CSP with no domain), and host filtering.
-- **Views** (Vitest with happy-dom, the SDK replaced by a fake one): formats and month navigation, `startView` (loading, tool errors, failed calls and connection, host theme, re-render on a width change only), text never written as markup and attributes outside the allowlist refused, the chart edge cases, and the three views rendered on JSON fixtures that a C# test keeps equal to the structured content of the tools. ESLint (with `eslint-plugin-no-unsanitized`) forbids every way of turning a string into markup or code.
+- **Infrastructure**: domain ↔ row conversions and the schema checked offline from the EF Core model; then, on a real SQL Server (Testcontainers, one fresh migrated database per test): migrations, round trip of every entity, constraints, cascades, the month reader, the writer (create, replace in the same row, other months untouched, two first saves at once) and the demo seeder.
+- **MCP server**: unit tests of the tool outputs and text summaries on plans built in memory, of the month argument and of the clock (month change in Paris time); then end-to-end tests on the `/mcp` endpoint with an in-memory server, a real SQL Server and a fixed clock: the four data tools (annotations, output schema, figures equal to the domain applied to the demo plan, tool errors), the three view tools (their `ui://` link, a result equal to their data tool, valid and invalid months), the input tool (visibility `app`, hints, a result equal to the data tool after the save, invalid calls with nothing written), only the input tools hidden from the model and only they writing, requests from a foreign `Origin` refused, the views (MIME type, self-contained: nothing loaded from outside, a CSP with no domain; each one mentions exactly its own tools), and host filtering.
+- **Views** (Vitest with happy-dom, the SDK replaced by a fake one): formats, amounts typed in French and month navigation, `startView` (loading, tool errors, failed calls and connection, host theme, re-render on a width change only, input calls with the same guard as the navigation), the starting balance form (sent arguments, refused input, form kept open on a refusal, cancel), text never written as markup and attributes outside the allowlist refused, the chart edge cases, and the three views rendered on JSON fixtures that a C# test keeps equal to the structured content of the tools. ESLint (with `eslint-plugin-no-unsanitized`) forbids every way of turning a string into markup or code.
 
 Tests use xUnit v3 on the Microsoft Testing Platform (declared in `global.json`).
 
@@ -176,7 +184,7 @@ Every change goes through a pull request: `main` is protected, and the CI (build
 
 ## Security
 
-This is a local development build: the MCP endpoint has **no authentication yet** and must not be exposed as is. The hardening planned before any deployment is tracked in [#2](https://github.com/alexismoreaullobera/hestia-room-finance/issues/2).
+This is a local development build: the MCP endpoint has **no authentication yet** and must not be exposed as is. The input tools are hidden from the model by the MCP Apps hosts only (visibility `app`; a host without MCP Apps support offers them to its model), and **this is not access control**: any MCP client reaching the endpoint can call them. Every value still goes through the rules of the domain before being saved, and a request sent by a web page is refused unless its `Origin` is an allowed host origin (Development: `Cors:DevMcpHostOrigins`). The hardening planned before any deployment is tracked in [#2](https://github.com/alexismoreaullobera/hestia-room-finance/issues/2).
 
 Found a vulnerability? Please report it privately, see [SECURITY.md](SECURITY.md).
 

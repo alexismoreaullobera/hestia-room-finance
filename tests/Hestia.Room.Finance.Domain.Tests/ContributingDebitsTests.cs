@@ -106,4 +106,16 @@ public class ContributingDebitsTests
 
         Assert.Equal(fromZero.ContributingDebits, withBuffer.ContributingDebits);
     }
+
+    [Fact]
+    public void ContributingDebits_InJanuaryOfTheYear1_AreComputed()
+    {
+        // The first month a view can reach (0000-12 is refused): the day before it does not exist.
+        var january1 = new YearMonth(1, 1);
+        var rent = Expense("Rent", 650m, day: 5, start: new DateOnly(1, 1, 1));
+
+        var forecast = CashFlowForecast.Compute(january1, 0m, [rent], []);
+
+        Assert.Equal([rent], forecast.ContributingDebits.Select(o => o.Line));
+    }
 }

@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 import { element } from "../src/shared/dom";
-import type { HostApp, ToolResult } from "../src/shared/view";
+import type { HostApp, ToolResult, ViewContext } from "../src/shared/view";
 
 /** The page skeleton every view has (see views/*.html), built with the kit itself. */
 export function pageSkeleton(): HTMLElement {
@@ -21,6 +21,11 @@ export function pageSkeleton(): HTMLElement {
  */
 export function setWidth(node: HTMLElement, width: number): void {
   Object.defineProperty(node, "clientWidth", { configurable: true, get: () => (node.hidden ? 0 : width) });
+}
+
+/** A render context at the given width, as startView gives it; the test can watch or decide the input calls. */
+export function at(width: number, call = vi.fn<ViewContext["call"]>(() => Promise.resolve(true))): ViewContext {
+  return { width, call };
 }
 
 /** A tool result with no text content: what a view reads is its structured content or its error flag. */

@@ -38,6 +38,32 @@ public class MonthArgumentTests
     }
 
     [Fact]
+    public void Parse_WithAMonth_GivesThatMonth()
+    {
+        Assert.Equal(new YearMonth(2026, 4), MonthArgument.Parse("2026-04"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    [InlineData("2026-13")]
+    public void Parse_WithoutAValidMonth_ThrowsInsteadOfTakingTheCurrentMonth(string? month)
+    {
+        // An input tool never writes to a month by default: the view always says which month it changes.
+        var error = Assert.Throws<McpException>(() => MonthArgument.Parse(month));
+
+        Assert.Contains("YYYY-MM", error.Message);
+    }
+
+    [Fact]
+    public void Parse_WithoutAMonth_SaysThereIsNone()
+    {
+        // "month": null, which the SDK binds even into a non-nullable string.
+        Assert.Contains("(none)", Assert.Throws<McpException>(() => MonthArgument.Parse(null)).Message);
+    }
+
+    [Fact]
     public void Resolve_WithALongInvalidMonth_DoesNotEchoIt()
     {
         // The message goes back into the model context: a long value is never copied there.

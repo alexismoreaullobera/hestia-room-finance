@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ViewContext } from "../src/shared/view";
 import { cashFlowForecast, chart, MIN_WIDTH } from "../src/cash-flow-forecast";
 import { monthOverview } from "../src/month-overview";
 import type { CashFlowForecastOutput, MonthSummaryOutput, SubscriptionOutput, SubscriptionsOutput } from "../src/shared/outputs";
@@ -7,7 +8,8 @@ import { subscriptions } from "../src/subscriptions";
 import forecastFixture from "./fixtures/cash-flow-forecast.json";
 import monthFixture from "./fixtures/month-overview.json";
 import subscriptionsFixture from "./fixtures/subscriptions.json";
-import { plain } from "./helpers";
+import { startView } from "../src/shared/view";
+import { asHostApp, at, fakeApp, ManualResizeObserver, pageSkeleton, plain, toolResult } from "./helpers";
 
 // The fixtures are the structured content of the view tools on the demo plan, written and checked by a C# test.
 // Typed by annotation, not by assertion: the compiler checks that they match the interfaces. The subscriptions need
@@ -49,7 +51,7 @@ describe("month overview", () => {
   };
 
   it("shows the planned and actual savings capacity, as due this month and on an average month", () => {
-    monthOverview.render({ ...demoMonth, actual }, content, 640);
+    monthOverview.render({ ...demoMonth, actual }, content, at(640));
 
     expect(texts(".card .title")).toEqual(["Capacité d'épargne prévue", "Capacité d'épargne réelle"]);
     expect(texts(".card .big")).toEqual([euros(planned.savingsCapacity), euros(actual.savingsCapacity)]);
@@ -58,7 +60,7 @@ describe("month overview", () => {
   });
 
   it("shows the figures side by side, planned then actual", () => {
-    monthOverview.render({ ...demoMonth, actual }, content, 640);
+    monthOverview.render({ ...demoMonth, actual }, content, at(640));
 
     expect(rows()).toEqual([
       [["Entrées"], [euros(planned.incomes)], [euros(2300)]],
@@ -73,7 +75,7 @@ describe("month overview", () => {
 
 describe("cash flow forecast", () => {
   it("shows the alert with the buffer to start with, the figures, the chart and the debits", () => {
-    cashFlowForecast.render(demoForecast, content, 640);
+    cashFlowForecast.render(demoForecast, content, at(640));
 
     expect(demoForecast.hasAlert).toBe(true);
     expect(plain(content.querySelector(".alert")?.textContent)).toContain(`au moins ${plain(formatEuros(demoForecast.cashBuffer))}`);
@@ -86,7 +88,7 @@ describe("cash flow forecast", () => {
   });
 
   it("says the month starts overdrawn instead of a buffer of 0 €", () => {
-    cashFlowForecast.render({ ...demoForecast, startsOverdrawn: true, cashBuffer: 0 }, content, 640);
+    cashFlowForecast.render({ ...demoForecast, startsOverdrawn: true, cashBuffer: 0 }, content, at(640));
 
     const alert = plain(content.querySelector(".alert")?.textContent);
     expect(alert).toContain("démarre déjà à découvert");
@@ -94,7 +96,7 @@ describe("cash flow forecast", () => {
   });
 
   it("shows a calm note and no debits table when there is no alert and no debit", () => {
-    cashFlowForecast.render({ ...demoForecast, hasAlert: false, contributingDebits: [] }, content, 640);
+    cashFlowForecast.render({ ...demoForecast, hasAlert: false, contributingDebits: [] }, content, at(640));
 
     expect(content.querySelector(".calm")?.textContent).toContain("Pas d'alerte");
     expect(content.querySelector(".alert")).toBeNull();
@@ -105,10 +107,164 @@ describe("cash flow forecast", () => {
     const trap = `<img src=x onerror="alert(1)">`;
     const debit = { name: trap, date: "2027-03-05", amount: 720 };
 
-    cashFlowForecast.render({ ...demoForecast, contributingDebits: [debit] }, content, 640);
+    cashFlowForecast.render({ ...demoForecast, contributingDebits: [debit] }, content, at(640));
 
     expect(content.querySelector("img")).toBeNull();
     expect(texts("tbody tr td:nth-child(2)")).toEqual([trap]);
+  });
+});
+
+describe("starting balance form", () => {
+  const card = () => content.querySelector<HTMLElement>(".starting-balance")!;
+  const field = () => card().querySelector("input")!;
+  const buttonNamed = (name: string) => [...card().querySelectorAll("button")].find(b => b.textContent === name)!;
+  /** Submits the form as the Enregistrer button or the Enter key would; returns the event to check its default. */
+  const submit = () => {
+    const event = new Event("submit", { cancelable: true });
+    card().querySelector("form")!.dispatchEvent(event);
+    return event;
+  };
+
+  function open(call = vi.fn<ViewContext["call"]>(() => Promise.resolve(true))) {
+    cashFlowForecast.render(demoForecast, content, at(640, call));
+    buttonNamed("Modifier").click();
+    return call;
+  }
+
+  it("shows the balance with a button to change it, and no field", () => {
+    cashFlowForecast.render(demoForecast, content, at(640));
+
+    expect(plain(card().querySelector(".big")?.textContent)).toBe(euros(demoForecast.startingBalance));
+    expect(buttonNamed("Modifier").getAttribute("type")).toBe("button");
+    expect(card().querySelector("input")).toBeNull();
+  });
+
+  it("opens a field prefilled with the balance, named after the month, focused and selected", () => {
+    open();
+
+    expect(card().classList.contains("editing")).toBe(true);
+    expect(plain(field().value)).toBe("400,00");
+    expect(field().getAttribute("inputmode")).toBe("decimal");
+    expect(field().getAttribute("aria-label")).toBe("Solde de départ de Mars 2027");
+    expect(document.activeElement).toBe(field());
+    // Selected: typing replaces the value at once.
+    expect([field().selectionStart, field().selectionEnd]).toEqual([0, field().value.length]);
+  });
+
+  it("sends the month and the amount typed when Enregistrer is clicked, disabling the form meanwhile", () => {
+    const call = open(vi.fn<ViewContext["call"]>(() => new Promise(() => {})));
+    field().value = "-1 250,50";
+
+    // The real path: the button submits its form (a type="button" would do nothing here).
+    buttonNamed("Enregistrer").click();
+
+    expect(call).toHaveBeenCalledExactlyOnceWith("set_starting_balance", { month: "2027-03", startingBalance: -1250.5 });
+    expect(field().disabled).toBe(true);
+    expect(buttonNamed("Enregistrer").disabled).toBe(true);
+    expect(buttonNamed("Annuler").disabled).toBe(true);
+  });
+
+  it("never lets the form be submitted by default, which would navigate the frame of the view", () => {
+    open(vi.fn<ViewContext["call"]>(() => new Promise(() => {})));
+
+    expect(submit().defaultPrevented).toBe(true);
+  });
+
+  it.each(["", "abc", "12,345"])("refuses %j without calling the tool, keeping the form open", (typed) => {
+    const call = open();
+    field().value = typed;
+
+    submit();
+
+    expect(call).not.toHaveBeenCalled();
+    expect(card().querySelector(".field-error")?.textContent).toBe("Montant attendu, par exemple 1 250,50.");
+    expect(card().querySelector(".field-error")?.getAttribute("role")).toBe("alert");
+    expect(field().value).toBe(typed);
+  });
+
+  it("brings the focus back to the field on a wrong amount", () => {
+    open();
+    field().value = "abc";
+    buttonNamed("Annuler").focus();
+
+    submit();
+
+    expect(document.activeElement).toBe(field());
+  });
+
+  it("enables the form again with what was typed when the save is not shown", async () => {
+    const call = open(vi.fn<ViewContext["call"]>(() => Promise.resolve(false)));
+    field().value = "300";
+
+    submit();
+
+    await vi.waitFor(() => { expect(field().disabled).toBe(false); });
+    expect(call).toHaveBeenCalledOnce();
+    expect(field().value).toBe("300");
+    expect(buttonNamed("Enregistrer").disabled).toBe(false);
+    expect(buttonNamed("Annuler").disabled).toBe(false);
+    expect(document.activeElement).toBe(field());
+  });
+
+  it("clears the message of a wrong amount once a right one is sent", () => {
+    open();
+    field().value = "abc";
+    submit();
+
+    field().value = "300";
+    submit();
+
+    expect(card().querySelector(".field-error")?.textContent).toBe("");
+  });
+
+  it.each([
+    ["Annuler", () => { buttonNamed("Annuler").click(); }],
+    ["Échap", () => { field().dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); }],
+  ])("closes the form without saving on %s, back to the button", (_, close) => {
+    const call = open();
+    field().value = "999";
+
+    close();
+
+    expect(call).not.toHaveBeenCalled();
+    expect(card().classList.contains("editing")).toBe(false);
+    expect(plain(card().querySelector(".big")?.textContent)).toBe(euros(demoForecast.startingBalance));
+    expect(document.activeElement).toBe(buttonNamed("Modifier"));
+  });
+
+  it.each(["a", "Enter", "Tab"])("keeps the form open on the key %s", (key) => {
+    const call = open();
+
+    field().dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+
+    expect(card().querySelector("form")).not.toBeNull();
+    expect(call).not.toHaveBeenCalled();
+  });
+});
+
+describe("starting balance saved through startView", () => {
+  // The form and the kit together, the SDK being the only fake: what a user sees after Enregistrer.
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("redraws the card with the figure of the server, the focus back on Modifier", async () => {
+    vi.stubGlobal("ResizeObserver", ManualResizeObserver);
+    const page = pageSkeleton();
+    const app = fakeApp();
+    // The server answers with its own figure (rounded, recalculated): the view shows it, never what was typed.
+    app.callServerTool.mockResolvedValue(toolResult({ structuredContent: { ...demoForecast, startingBalance: 300 } }));
+    await startView(cashFlowForecast, asHostApp(app));
+    app.sendResult(toolResult({ structuredContent: { ...demoForecast } }));
+    const balanceCard = () => page.querySelector<HTMLElement>(".starting-balance")!;
+    [...balanceCard().querySelectorAll("button")].find(b => b.textContent === "Modifier")!.click();
+    balanceCard().querySelector("input")!.value = "300";
+
+    [...balanceCard().querySelectorAll("button")].find(b => b.textContent === "Enregistrer")!.click();
+
+    await vi.waitFor(() => { expect(balanceCard().querySelector("input")).toBeNull(); });
+    expect(app.callServerTool).toHaveBeenCalledWith({ name: "set_starting_balance", arguments: { month: "2027-03", startingBalance: 300 } });
+    expect(balanceCard().classList.contains("editing")).toBe(false);
+    expect(plain(balanceCard().querySelector(".big")?.textContent)).toBe(euros(300));
+    expect(document.activeElement).toBe(balanceCard().querySelector(".edit"));
   });
 });
 
@@ -161,7 +317,7 @@ describe("chart", () => {
 
 describe("subscriptions", () => {
   it("shows the totals and one row per subscription, in French", () => {
-    subscriptions.render(demoSubscriptions, content, 640);
+    subscriptions.render(demoSubscriptions, content, at(640));
 
     expect(texts(".card .big")).toEqual([
       euros(demoSubscriptions.monthlyTotal), euros(demoSubscriptions.yearlyTotal),
@@ -177,14 +333,14 @@ describe("subscriptions", () => {
       category: "Insurance", monthlyEquivalent: 15, yearlyCost: 180, dueDate: null, commitmentEndDate: null,
     };
 
-    subscriptions.render({ ...demoSubscriptions, subscriptions: [quarterly] }, content, 640);
+    subscriptions.render({ ...demoSubscriptions, subscriptions: [quarterly] }, content, at(640));
 
     expect(rows()).toEqual([
       [["Assurance habitation", "Assurance"], ["45,00 €", "trimestriel"], ["15,00 €"], ["pas ce mois-ci"], ["sans"]]]);
   });
 
   it("says when there is no subscription", () => {
-    subscriptions.render({ ...demoSubscriptions, subscriptions: [] }, content, 640);
+    subscriptions.render({ ...demoSubscriptions, subscriptions: [] }, content, at(640));
 
     expect(content.textContent).toBe("Aucun abonnement en cours ce mois-ci.");
   });
@@ -192,7 +348,7 @@ describe("subscriptions", () => {
   it("says when a subscription is not debited this month", () => {
     const first = { ...demoSubscriptions.subscriptions[0]!, dueDate: null };
 
-    subscriptions.render({ ...demoSubscriptions, subscriptions: [first] }, content, 640);
+    subscriptions.render({ ...demoSubscriptions, subscriptions: [first] }, content, at(640));
 
     expect(texts("tbody tr td:nth-child(4)")).toEqual(["pas ce mois-ci"]);
   });

@@ -2,12 +2,13 @@
 // through an allowlist; this file is the only one ESLint allows to call setAttribute (see eslint.config.js).
 import { formatEuros } from "./format";
 
-// The only attributes the views may set: presentation and accessibility, never a link (href, src), a style or an
-// event handler (on*), so that no name typed by the user can ever become code or a link. clip-path takes a url(),
-// only a local url(#id) written by the code (never data).
+// The only attributes the views may set: presentation, accessibility and the kind of a form field, never a link
+// (href, src), a form target (action, formaction), a style or an event handler (on*), so that no name typed by the
+// user can ever become code or a link. clip-path takes a url(), only a local url(#id) written by the code (never
+// data). The value of a field is set through its value property, never as an attribute.
 const SAFE_ATTRIBUTES: ReadonlySet<string> = new Set([
   "role", "aria-label", "id", "class", "viewBox", "x", "y", "x1", "x2", "y1", "y2", "cx", "cy", "r",
-  "width", "height", "points", "text-anchor", "clip-path",
+  "width", "height", "points", "text-anchor", "clip-path", "type", "inputmode", "autocomplete",
 ]);
 
 export type Attributes = Readonly<Record<string, string | number>>;
@@ -25,12 +26,25 @@ export interface ElementOptions {
   attributes?: Attributes;
 }
 
+// The tags a view may never create: the ones that run or load something (a script, a style, a frame, an embedded
+// object, a base URL, a link or a meta tag), so that no text given to the kit can become code, style or a navigation.
+// Refused by the types (SafeTag, SafeSvgTag) and again at run time, since a cast gets round the types.
+const UNSAFE_TAGS = ["script", "style", "iframe", "frame", "frameset", "object", "embed", "base", "link", "meta"] as const;
+
+export type SafeTag = Exclude<keyof HTMLElementTagNameMap, (typeof UNSAFE_TAGS)[number]>;
+export type SafeSvgTag = Exclude<keyof SVGElementTagNameMap, (typeof UNSAFE_TAGS)[number]>;
+
+function checkTag(tag: string): void {
+  if ((UNSAFE_TAGS as readonly string[]).includes(tag.toLowerCase())) throw new Error(`Tag not allowed in a view: ${tag}`);
+}
+
 /**
  * Creates an element. Text is set with textContent only (strings among the children become text nodes), never as
  * HTML: the data comes from tools and is untrusted (XSS, prompt injection through a name typed by the user).
  */
-export function element<K extends keyof HTMLElementTagNameMap>(
+export function element<K extends SafeTag>(
   tag: K, { className, text, attributes }: ElementOptions = {}, ...children: (Node | string)[]): HTMLElementTagNameMap[K] {
+  checkTag(tag);
   const node = document.createElement(tag);
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
@@ -39,9 +53,10 @@ export function element<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-/** Creates an SVG element, with the same rules as element(): safe attributes only, strings as text nodes. */
-export function svg<K extends keyof SVGElementTagNameMap>(
+/** Creates an SVG element, with the same rules as element(): safe tags and attributes only, strings as text nodes. */
+export function svg<K extends SafeSvgTag>(
   tag: K, attributes: Attributes = {}, ...children: (Node | string)[]): SVGElementTagNameMap[K] {
+  checkTag(tag);
   const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
   setAttributes(node, attributes);
   node.append(...children);
@@ -53,10 +68,16 @@ export function amount(value: number, tag: "span" | "td" = "span"): HTMLElement 
   return element(tag, { className: value < 0 ? "amount negative" : "amount", text: formatEuros(value) });
 }
 
-/** A key figure: its title, its value (a node or a text) and an optional detail. Laid out by .cards. */
-export function card(title: string, value: Node | string, detail?: Node | string): HTMLElement {
-  return element("div", { className: "card" },
+/** The content of a card: its title, its value (a node or a text) and an optional detail. */
+export function cardContent(title: string, value: Node | string, detail?: Node | string): HTMLElement[] {
+  return [
     element("div", { className: "title", text: title }),
     element("div", { className: "big" }, value),
-    ...(detail === undefined ? [] : [element("div", { className: "detail" }, detail)]));
+    ...(detail === undefined ? [] : [element("div", { className: "detail" }, detail)]),
+  ];
+}
+
+/** A key figure: its title, its value (a node or a text) and an optional detail. Laid out by .cards. */
+export function card(title: string, value: Node | string, detail?: Node | string): HTMLElement {
+  return element("div", { className: "card" }, ...cardContent(title, value, detail));
 }

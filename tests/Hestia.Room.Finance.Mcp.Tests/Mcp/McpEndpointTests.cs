@@ -26,6 +26,14 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
     private static readonly string[] DataTools = ["get_month_summary", "get_cash_flow_forecast", "list_recurring_lines", "list_subscriptions"];
 
+    private static readonly string[] InputTools = ["set_starting_balance"];
+
+    /// <summary>The input tools each view calls from its forms (literals too: renaming one must break the views).</summary>
+    private static readonly Dictionary<string, string[]> InputToolsOfViews = new()
+    {
+        ["ui://finance/cash-flow-forecast.html"] = ["set_starting_balance"],
+    };
+
     public static TheoryData<string, string, string> ViewToolsViewsAndTitles =>
         new(ViewTable.Select(v => (v.ViewTool, v.ViewUri, v.Title)));
 
@@ -47,12 +55,24 @@ public partial class McpEndpointTests(McpServerFixture mcp)
     private readonly McpTestClient _mcp = new(mcp.Server.CreateClient());
 
     [Fact]
-    public async Task TheServer_ExposesExactlyTheDataToolsAndTheViewTools()
+    public async Task TheServer_ExposesExactlyTheDataToolsTheViewToolsAndTheInputTools()
     {
         // Pitfall: WithTools(typeof(X)) compiled but registered no tool at all. Also catches the spike coming back.
         var names = (await _mcp.SendAsync("tools/list"))["tools"]!.AsArray().Select(t => (string)t!["name"]!);
 
-        Assert.Equal(DataTools.Concat(ViewTable.Select(v => v.ViewTool)).Order(), names.Order());
+        Assert.Equal(DataTools.Concat(ViewTable.Select(v => v.ViewTool)).Concat(InputTools).Order(), names.Order());
+    }
+
+    [Fact]
+    public async Task OnlyTheInputTools_AreHiddenFromTheModel()
+    {
+        // The agent has no write access in the v1: every tool it is offered reads, every write is for the views.
+        var tools = (await _mcp.SendAsync("tools/list"))["tools"]!.AsArray();
+        var appOnly = tools.Where(t => t!["_meta"]?["ui"]?["visibility"]?.AsArray().Select(v => (string?)v).SequenceEqual(["app"]) == true);
+        var writes = tools.Where(t => (bool?)t!["annotations"]?["readOnlyHint"] != true);
+
+        Assert.Equal(InputTools.Order(), appOnly.Select(t => (string)t!["name"]!).Order());
+        Assert.Equal(InputTools.Order(), writes.Select(t => (string)t!["name"]!).Order());
     }
 
     [Fact]
@@ -161,15 +181,20 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
     [Theory]
     [MemberData(nameof(ViewToolsAndViews))]
-    public async Task AView_CallsOnlyItsOwnTool_AndHasEveryPageElement(string viewTool, string viewUri)
+    public async Task AView_CallsOnlyItsOwnTools_AndHasEveryPageElement(string viewTool, string viewUri)
     {
-        // A view wired to another tool would navigate into the wrong view; a page without one of the ids that
-        // startView requires would stay blank. The ids come from view.ts, the single list both sides read.
+        // A view wired to another tool would navigate into the wrong view or write to the wrong figure; a page without
+        // one of the ids that startView requires would stay blank. The ids come from view.ts, the single list both
+        // sides read. The tools looked for are the ones the server exposes: the SDK bundled in the view has its own
+        // words (list_changed), which are no tool.
         var html = (string)(await ReadViewAsync(viewUri))["text"]!;
         var view = File.ReadAllText(Path.Combine(ViewFixturesTests.ViewsProjectDirectory(), "src", "shared", "view.ts"));
         var pageIds = Quoted().Matches(PageIds().Match(view).Groups[1].Value).Select(m => m.Groups[1].Value).ToList();
+        var serverTools = (await _mcp.SendAsync("tools/list"))["tools"]!.AsArray().Select(t => (string)t!["name"]!);
 
-        Assert.Equal([viewTool], ViewToolName().Matches(html).Select(m => m.Value));
+        var mentioned = serverTools.Where(name => Regex.IsMatch(html, $@"\b{Regex.Escape(name)}\b"));
+
+        Assert.Equal(InputToolsOfViews.GetValueOrDefault(viewUri, []).Append(viewTool).Order(), mentioned.Order());
         Assert.Equal(["label", "previous", "month", "next", "status", "content"], pageIds);
         Assert.All(pageIds, id => Assert.Contains($"id=\"{id}\"", html));
     }
@@ -197,15 +222,60 @@ public partial class McpEndpointTests(McpServerFixture mcp)
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Request_FromAForeignOrigin_IsRefused_AndWritesNothing()
+    {
+        // A web page of another site making the browser call the server: refused before any tool runs.
+        using var request = McpTestClient.CreateRequest("tools/call", SetStartingBalance("2031-06", 10m));
+        request.Headers.Add("Origin", "https://evil.example");
+
+        using var response = await _mcp.Http.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(0m, await StartingBalanceAsync("2031-06"));
+    }
+
+    [Fact]
+    public async Task Request_FromAnAllowedHostOrigin_IsServed()
+    {
+        // The origin of a local web host allowed in Development (Cors:DevMcpHostOrigins).
+        using var request = McpTestClient.CreateRequest("tools/list");
+        request.Headers.Add("Origin", "http://localhost:8080");
+
+        using var response = await _mcp.Http.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Request_AsPlainText_IsRefused_AndWritesNothing()
+    {
+        // What a cross-site HTML form or a "simple" fetch can send without a CORS preflight: never a call.
+        using var request = McpTestClient.CreateRequest("tools/call", SetStartingBalance("2031-07", 10m));
+        request.Content = new StringContent(await request.Content!.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            System.Text.Encoding.UTF8, "text/plain");
+
+        using var response = await _mcp.Http.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.False(response.IsSuccessStatusCode);
+        Assert.Equal(0m, await StartingBalanceAsync("2031-07"));
+    }
+
+    private static JsonObject SetStartingBalance(string month, decimal startingBalance) => new()
+    {
+        ["name"] = "set_starting_balance",
+        ["arguments"] = new JsonObject { ["month"] = month, ["startingBalance"] = startingBalance },
+    };
+
+    private async Task<decimal?> StartingBalanceAsync(string month) =>
+        (decimal?)(await _mcp.CallToolAsync("get_cash_flow_forecast", new JsonObject { ["month"] = month }))["structuredContent"]!["startingBalance"];
+
     [GeneratedRegex(@"<script type=""module""")]
     private static partial Regex ModuleScript();
 
     // A src or href attribute pointing to another origin (any scheme, or protocol relative).
     [GeneratedRegex(@"\b(?:src|href)\s*=\s*[""']?(?:[a-z][a-z0-9+.-]*:)?//", RegexOptions.IgnoreCase)]
     private static partial Regex ExternalLoad();
-
-    [GeneratedRegex(@"\bshow_[a-z_]+\b")]
-    private static partial Regex ViewToolName();
 
     [GeneratedRegex(@"PAGE_IDS = \[([^\]]+)\]")]
     private static partial Regex PageIds();

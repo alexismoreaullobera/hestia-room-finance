@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.CompilerServices;
 
 namespace Hestia.Room.Finance.Domain;
@@ -23,6 +24,20 @@ internal static class Guard
         if (decimal.Round(amount, 2) != amount)
         {
             throw new ArgumentException("An amount in euros has at most two decimals.", paramName);
+        }
+    }
+
+    /// <summary>
+    /// Rejects an amount beyond <see cref="AmountLimit.Max"/>, positive or negative: what an input sent by hand (a
+    /// typo, a call outside the views) could hold, never a real figure of a month.
+    /// </summary>
+    public static void ThrowIfTooLarge(decimal amount, [CallerArgumentExpression(nameof(amount))] string? paramName = null)
+    {
+        if (Math.Abs(amount) > AmountLimit.Max)
+        {
+            // Invariant: the same message whatever the culture, in the logs too (a row read back goes through here).
+            throw new ArgumentOutOfRangeException(paramName, amount,
+                string.Create(CultureInfo.InvariantCulture, $"An amount in euros is at most {AmountLimit.Max} either way."));
         }
     }
 }
