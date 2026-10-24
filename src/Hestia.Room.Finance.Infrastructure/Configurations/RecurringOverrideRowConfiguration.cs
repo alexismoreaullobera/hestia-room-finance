@@ -10,8 +10,9 @@ internal sealed class RecurringOverrideRowConfiguration : IEntityTypeConfigurati
     {
         lineOverride.ToTable("RecurringOverrides", table =>
         {
-            // Null means "skipped this month"; otherwise the actual amount is positive.
-            table.HasCheckConstraint("CK_RecurringOverrides_ActualAmount", "[ActualAmount] IS NULL OR [ActualAmount] > 0");
+            // Null means "skipped this month"; otherwise the actual amount is positive, within the bound.
+            table.HasCheckConstraint("CK_RecurringOverrides_ActualAmount",
+                $"[ActualAmount] IS NULL OR ([ActualAmount] > 0 AND [ActualAmount] <= {AmountBound.Sql})");
             table.HasCheckConstraint("CK_RecurringOverrides_Month", "DAY([Month]) = 1");
         });
 

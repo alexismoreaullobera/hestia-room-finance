@@ -39,7 +39,7 @@ namespace Hestia.Room.Finance.Infrastructure.Migrations
 
                     b.ToTable("BudgetActuals", "finance", t =>
                         {
-                            t.HasCheckConstraint("CK_BudgetActuals_Amount", "[Amount] >= 0");
+                            t.HasCheckConstraint("CK_BudgetActuals_Amount", "[Amount] BETWEEN 0 AND 999999999.99");
 
                             t.HasCheckConstraint("CK_BudgetActuals_Month", "DAY([Month]) = 1");
                         });
@@ -81,6 +81,8 @@ namespace Hestia.Room.Finance.Infrastructure.Migrations
                     b.ToTable("MonthPlans", "finance", t =>
                         {
                             t.HasCheckConstraint("CK_MonthPlans_Month", "DAY([Month]) = 1");
+
+                            t.HasCheckConstraint("CK_MonthPlans_StartingBalance", "[StartingBalance] BETWEEN -999999999.99 AND 999999999.99");
                         });
                 });
 
@@ -159,7 +161,7 @@ namespace Hestia.Room.Finance.Infrastructure.Migrations
 
                     b.ToTable("RecurringOverrides", "finance", t =>
                         {
-                            t.HasCheckConstraint("CK_RecurringOverrides_ActualAmount", "[ActualAmount] IS NULL OR [ActualAmount] > 0");
+                            t.HasCheckConstraint("CK_RecurringOverrides_ActualAmount", "[ActualAmount] IS NULL OR ([ActualAmount] > 0 AND [ActualAmount] <= 999999999.99)");
 
                             t.HasCheckConstraint("CK_RecurringOverrides_Month", "DAY([Month]) = 1");
                         });
