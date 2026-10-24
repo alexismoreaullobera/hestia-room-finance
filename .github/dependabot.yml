@@ -36,6 +36,11 @@ updates:
       npm-dev-minor-and-patch:
         dependency-type: development
         update-types: [minor, patch]
+    ignore:
+      # typescript-eslint (ESLint on the TypeScript of the views) requires typescript <6.1.0: a newer TypeScript breaks
+      # npm ci (ERESOLVE, see #21). Lift this rule once a typescript-eslint release accepts it, and update both together.
+      - dependency-name: typescript
+        versions: [">=6.1.0"]
     commit-message:
       prefix: deps
 
