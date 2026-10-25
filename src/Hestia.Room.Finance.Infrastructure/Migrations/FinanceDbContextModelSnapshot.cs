@@ -61,6 +61,9 @@ namespace Hestia.Room.Finance.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Name")
+                        .IsUnique();
+
                     b.ToTable("Budgets", "finance", t =>
                         {
                             t.HasCheckConstraint("CK_Budgets_PlannedAmount", "[PlannedAmount] > 0");

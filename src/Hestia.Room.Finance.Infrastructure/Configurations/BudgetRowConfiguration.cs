@@ -13,5 +13,8 @@ internal sealed class BudgetRowConfiguration : IEntityTypeConfiguration<BudgetRo
         budget.HasKey(b => b.Id);
         budget.Property(b => b.Id).ValueGeneratedNever();
         budget.Property(b => b.Name).HasMaxLength(100);
+        // Two budgets never share a name: checked by the domain (PlanBudgets), and here in the last resort. The default
+        // collation of SQL Server ignores case, like the domain.
+        budget.HasIndex(b => b.Name).IsUnique();
     }
 }

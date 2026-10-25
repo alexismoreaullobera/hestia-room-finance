@@ -102,6 +102,13 @@ public class FinanceDbContextModelTests
     }
 
     [Fact]
+    public void BudgetNames_AreUnique_InTheCreationScript()
+    {
+        // The last resort of the rule of PlanBudgets: two budgets never share a name.
+        Assert.Contains("CREATE UNIQUE INDEX [IX_Budgets_Name] ON [finance].[Budgets] ([Name])", CreateScript);
+    }
+
+    [Fact]
     public void MigrationsHistory_IsInTheFinanceSchema()
     {
         // Several rooms may share a database: each keeps its own migrations history.

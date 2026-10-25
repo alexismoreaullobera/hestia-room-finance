@@ -26,6 +26,33 @@ public sealed class FinancePlanWriter(FinanceDbContext context)
         return UpsertAsync(context.MonthPlans, [row.Month], row, cancellationToken);
     }
 
+    /// <summary>Adds a budget to the plan (its name checked free by <see cref="PlanBudgets"/>; the unique index in the last resort).</summary>
+    public async Task AddBudgetAsync(Budget budget, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(budget);
+        context.Budgets.Add(budget.ToRow());
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Renames a budget or gives it another planned amount, everywhere (past months included: no versioning). A budget
+    /// deleted meanwhile is not created again: the save fails instead.
+    /// </summary>
+    public async Task UpdateBudgetAsync(Budget budget, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(budget);
+        var row = await context.Budgets.FindAsync([budget.Id], cancellationToken)
+            ?? throw new InvalidOperationException("The budget was deleted meanwhile.");
+        await ReplaceAsync(row, budget.ToRow(), cancellationToken);
+    }
+
+    /// <summary>
+    /// Deletes a budget and, with it, every actual entered for it (the cascade of the foreign key): a budget has no dates,
+    /// so this is for a mistake, the view asking for a confirmation. Nothing to delete is not an error.
+    /// </summary>
+    public Task DeleteBudgetAsync(Guid budgetId, CancellationToken cancellationToken = default) =>
+        context.Budgets.Where(budget => budget.Id == budgetId).ExecuteDeleteAsync(cancellationToken);
+
     /// <summary>Saves the actual total of a budget for a month, replacing the one entered before.</summary>
     public Task SetBudgetActualAsync(BudgetActual actual, CancellationToken cancellationToken = default)
     {
