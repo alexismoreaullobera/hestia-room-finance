@@ -112,17 +112,31 @@ public class MonthSummaryOutputTests
     }
 
     [Fact]
-    public void Budgets_AreSortedOrdinally_ThenByIdentifier()
+    public void Budgets_AreSortedInFrench_ThenByIdentifier()
     {
-        // Ordinal: "Épargne" after "Sorties" (É is past every ASCII letter). Two "Courses" by identifier: a fixed one,
-        // lower than any Guid v7 and given after the other, so that keeping the input order instead would fail.
+        // In French: "Épargne" between "Courses" and "Sorties" (an ordinal order would put it last, É being past every
+        // ASCII letter). Two "Courses" by identifier: a fixed one, lower than any Guid v7 and given after the other, so
+        // that keeping the input order instead would fail.
         var savings = new Budget(Guid.CreateVersion7(), "Épargne", 50m);
         var outings = new Budget(Guid.CreateVersion7(), "Sorties", 120m);
         var lowGroceries = new Budget(new Guid("00000000-0000-0000-0000-000000000001"), "Courses", 80m);
 
         var output = MonthSummaryOutput.From(April2026(0m, [], [savings, Groceries, outings, lowGroceries]));
 
-        Assert.Equal([lowGroceries.Id, Groceries.Id, outings.Id, savings.Id], output.Budgets.Select(b => b.Id));
+        Assert.Equal([lowGroceries.Id, Groceries.Id, savings.Id, outings.Id], output.Budgets.Select(b => b.Id));
+    }
+
+    [Fact]
+    public void Describe_NeverLetsANameCloseItsQuote()
+    {
+        var trap = new Budget(Guid.CreateVersion7(), "Courses » x", 50m);
+        var line = Monthly(FlowKind.Expense, "Loyer » y", 650m, day: 5);
+
+        var output = MonthSummaryOutput.From(April2026(0m, [line], [trap],
+            actuals: [new BudgetActual(trap.Id, April, 40m)], overrides: [RecurringOverride.Skipped(line.Id, April)]));
+
+        Assert.Contains("« Courses › x »", output.Describe(), StringComparison.Ordinal);
+        Assert.Contains("« Loyer › y » : n'a pas eu lieu", output.Describe(), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1,0 +1,37 @@
+/* The editable tables of the views (table.ts): the column of the buttons, a row being edited, confirmed or added. */
+td.action { width: 1%; text-align: right; white-space: nowrap; }
+td.action button + button { margin-left: 6px; }
+td .detail { display: block; color: var(--muted); font-size: 12px; }
+tr.editing td,
+tr.confirming td { background: var(--surface); }
+tr.editing .amount-form { max-width: 360px; }
+.confirmation { margin: 0 0 6px; }
+/* A long name without spaces wraps instead of widening the table past the view. */
+td:not(.action),
+.amount-form .title,
+.confirmation { overflow-wrap: anywhere; }
+button.remove,
+button.confirm,
+button.cancel,
+button.new {
+  font: inherit;
+  font-size: 12px;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+  padding: 2px 10px;
+  cursor: pointer;
+}
+button.confirm { border-color: var(--alert-line); color: var(--negative); }
+button.remove:hover,
+button.cancel:hover:not(:disabled),
+button.new:hover { border-color: var(--accent); }
+button.remove:focus-visible,
+button.confirm:focus-visible,
+button.cancel:focus-visible,
+button.new:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.confirm:disabled,
+button.cancel:disabled { opacity: .5; cursor: default; }
+.confirming .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+tfoot tr.new-row td { border-top: 1px solid var(--line); }

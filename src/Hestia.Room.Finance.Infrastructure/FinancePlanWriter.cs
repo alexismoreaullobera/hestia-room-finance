@@ -1,4 +1,5 @@
 using Hestia.Room.Finance.Domain;
+using Hestia.Room.Finance.Infrastructure.Configurations;
 using Hestia.Room.Finance.Infrastructure.Rows;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -8,10 +9,13 @@ namespace Hestia.Room.Finance.Infrastructure;
 /// <summary>
 /// Saves the inputs of the user, one use case per method: the counterpart of <see cref="FinancePlanReader"/>, not a
 /// generic CRUD layer over each table. The values come as domain objects, so they have passed the rules of their type
-/// (cents, bounds); whether a budget belongs to the month or a line is due that month is checked by the caller through
-/// <see cref="FinanceMonth"/>, before any write, clears included. The database constraints are a further check.
-/// The last save wins: the room has a single user. Two first saves of the same key end with the last value; a save
-/// meeting a concurrent clear, or a budget or line deleted meanwhile, fails with the database error instead.
+/// (cents, bounds, names); the rules involving the rest of the plan or the month are checked by the caller before any
+/// write, clears included: through <see cref="PlanBudgets"/> (a free name, an existing budget) and <see cref="FinanceMonth"/>
+/// (a budget of the plan, a line due that month). The database constraints are a further check.
+/// The last save wins: the room has a single user. Two first saves of the same key end with the last value. A budget
+/// name taken meanwhile fails with <see cref="NameTakenException"/>; a budget updated after its deletion, with an
+/// <see cref="InvalidOperationException"/>; a save meeting a concurrent clear, or a budget or line deleted meanwhile,
+/// with the database error.
 /// </summary>
 public sealed class FinancePlanWriter(FinanceDbContext context)
 {
@@ -25,6 +29,56 @@ public sealed class FinancePlanWriter(FinanceDbContext context)
         var row = plan.ToRow();
         return UpsertAsync(context.MonthPlans, [row.Month], row, cancellationToken);
     }
+
+    /// <summary>
+    /// Adds a budget to the plan. Its name is checked free by <see cref="PlanBudgets"/>; one taken meanwhile is refused
+    /// by the unique index, as a <see cref="NameTakenException"/>.
+    /// </summary>
+    public async Task AddBudgetAsync(Budget budget, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(budget);
+        var row = budget.ToRow();
+        context.Budgets.Add(row);
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException error) when (IsNameTaken(error))
+        {
+            // Never saved: the context forgets it, a later save in the same context does not try it again.
+            context.Entry(row).State = EntityState.Detached;
+            throw new NameTakenException(nameof(budget), error);
+        }
+    }
+
+    /// <summary>
+    /// Renames a budget or gives it another planned amount, everywhere (past months included: no versioning). A budget
+    /// deleted meanwhile is not created again: the save fails instead. A name taken meanwhile is refused by the unique
+    /// index, as a <see cref="NameTakenException"/>.
+    /// </summary>
+    public async Task UpdateBudgetAsync(Budget budget, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(budget);
+        var row = await context.Budgets.FindAsync([budget.Id], cancellationToken)
+            ?? throw new InvalidOperationException("The budget was deleted meanwhile.");
+        try
+        {
+            await ReplaceAsync(row, budget.ToRow(), cancellationToken);
+        }
+        catch (DbUpdateException error) when (IsNameTaken(error))
+        {
+            // The values refused leave the context: a later read in the same context finds the budget as saved.
+            context.Entry(row).State = EntityState.Detached;
+            throw new NameTakenException(nameof(budget), error);
+        }
+    }
+
+    /// <summary>
+    /// Deletes a budget and, with it, every actual entered for it (the cascade of the foreign key): a budget has no dates,
+    /// so this is for a mistake, the view asking for a confirmation. Nothing to delete is not an error.
+    /// </summary>
+    public Task DeleteBudgetAsync(Guid budgetId, CancellationToken cancellationToken = default) =>
+        context.Budgets.Where(budget => budget.Id == budgetId).ExecuteDeleteAsync(cancellationToken);
 
     /// <summary>Saves the actual total of a budget for a month, replacing the one entered before.</summary>
     public Task SetBudgetActualAsync(BudgetActual actual, CancellationToken cancellationToken = default)
@@ -97,6 +151,11 @@ public sealed class FinancePlanWriter(FinanceDbContext context)
             await ReplaceAsync(inserted, newRow, cancellationToken);
         }
     }
+
+    /// <summary>The unique index on the budget names refused the save: never another unique key, nor another constraint.</summary>
+    private static bool IsNameTaken(DbUpdateException error) =>
+        error.InnerException is SqlException { Number: 2601 or 2627 } database
+        && database.Message.Contains(BudgetRowConfiguration.NameIndex, StringComparison.Ordinal);
 
     /// <summary>Every column from the domain object, so that a field added later is never left out of an update.</summary>
     private async Task ReplaceAsync<TRow>(TRow row, TRow newRow, CancellationToken cancellationToken)

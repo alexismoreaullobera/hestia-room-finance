@@ -53,4 +53,16 @@ public sealed class FinanceViewTools
         [Description(MonthArgument.Description)] string? month = null,
         CancellationToken cancellationToken = default) =>
         FinanceDataTools.ListSubscriptions(reader, clock, month, cancellationToken);
+
+    [McpServerTool(Name = "show_plan", Title = "Vue : plan", ReadOnly = true, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true, OutputSchemaType = typeof(PlanOutput))]
+    [Description("Shows the user the plan itself, where it is edited: the budgets with their planned amount. Same data as "
+        + "get_plan, displayed as a view.")]
+    [McpAppUi(ResourceUri = FinanceViewResources.PlanUri)]
+    public static Task<CallToolResult> ShowPlan(
+        FinancePlanReader reader,
+        FinanceClock clock,
+        [Description(MonthArgument.Description)] string? month = null,
+        CancellationToken cancellationToken = default) =>
+        FinanceDataTools.GetPlan(reader, clock, month, cancellationToken);
 }

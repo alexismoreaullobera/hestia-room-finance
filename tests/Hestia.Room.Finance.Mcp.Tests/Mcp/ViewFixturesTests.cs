@@ -28,6 +28,7 @@ public class ViewFixturesTests(McpServerFixture mcp)
     [InlineData("show_month_overview", "month-overview.json")]
     [InlineData("show_cash_flow_forecast", "cash-flow-forecast.json")]
     [InlineData("show_subscriptions", "subscriptions.json")]
+    [InlineData("show_plan", "plan.json")]
     public async Task Fixture_IsTheStructuredContentOfTheViewTool(string viewTool, string fixture)
     {
         var content = (await _mcp.CallToolAsync(viewTool))["structuredContent"]!;

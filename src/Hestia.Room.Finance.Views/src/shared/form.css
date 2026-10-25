@@ -28,3 +28,6 @@ button.edit { font-size: 12px; }
 .amount-form .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .amount-form .field-error { color: var(--negative); font-size: 12px; margin-top: 4px; }
 .amount-form .field-error:empty { display: none; }
+/* Several fields: each with its visible label above its field. */
+.amount-form .field { display: block; }
+.amount-form .field span { display: block; color: var(--muted); font-size: 12px; }

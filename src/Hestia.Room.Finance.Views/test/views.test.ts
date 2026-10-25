@@ -3,13 +3,15 @@ import type { ViewContext } from "../src/shared/view";
 import { cashFlowForecast, chart, MIN_WIDTH } from "../src/cash-flow-forecast";
 import { monthOverview, SET_BUDGET_ACTUAL, SET_LINE_ACTUAL } from "../src/month-overview";
 import type {
-  BudgetActualOutput, CashFlowForecastOutput, LineActualOutput, MonthSummaryOutput, SubscriptionOutput, SubscriptionsOutput,
+  BudgetActualOutput, CashFlowForecastOutput, LineActualOutput, MonthSummaryOutput, PlanBudgetOutput, PlanOutput, SubscriptionOutput, SubscriptionsOutput,
 } from "../src/shared/outputs";
 import { formatEuros } from "../src/shared/format";
 import { subscriptions } from "../src/subscriptions";
 import forecastFixture from "./fixtures/cash-flow-forecast.json";
 import monthFixture from "./fixtures/month-overview.json";
 import subscriptionsFixture from "./fixtures/subscriptions.json";
+import planFixture from "./fixtures/plan.json";
+import { CREATE_BUDGET, DELETE_BUDGET, plan, UPDATE_BUDGET } from "../src/plan";
 import { startView } from "../src/shared/view";
 import { asHostApp, at, fakeApp, ManualResizeObserver, pageSkeleton, plain, toolResult } from "./helpers";
 
@@ -19,6 +21,7 @@ import { asHostApp, at, fakeApp, ManualResizeObserver, pageSkeleton, plain, tool
 const demoMonth = monthFixture as MonthSummaryOutput;
 const demoForecast: CashFlowForecastOutput = forecastFixture;
 const demoSubscriptions = subscriptionsFixture as SubscriptionsOutput;
+const demoPlan: PlanOutput = planFixture;
 
 let content: HTMLElement;
 beforeEach(() => {
@@ -37,6 +40,7 @@ describe("view definitions", () => {
     [monthOverview.tool, "show_month_overview"],
     [cashFlowForecast.tool, "show_cash_flow_forecast"],
     [subscriptions.tool, "show_subscriptions"],
+    [plan.tool, "show_plan"],
   ])("a view changes month through its own tool: %s", (tool, expected) => {
     // Written as literals: the view tool names are a contract with the server (tested on the server side too).
     expect(tool).toBe(expected);
@@ -523,6 +527,187 @@ describe("chart", () => {
     const tooltips = [...chart(demoForecast.days, demoForecast.lowPoint, 640).querySelectorAll("rect.day title")];
 
     expect(plain(tooltips[0]?.textContent)).toBe(`01/03 : ${plain(formatEuros(demoForecast.days[0]!.balance))}`);
+  });
+});
+
+describe("plan", () => {
+  const [fuel, groceries, outings] = demoPlan.budgets as [PlanBudgetOutput, PlanBudgetOutput, PlanBudgetOutput];
+  const rowOf = (index: number) => content.querySelectorAll(".budgets tbody tr")[index]!;
+  const newRow = () => content.querySelector(".budgets tfoot tr")!;
+  const buttonIn = (node: Element, name: string) => [...node.querySelectorAll("button")].find(b => b.textContent === name)!;
+  const fieldsIn = (node: Element) => [...node.querySelectorAll("input")];
+  const submitIn = (node: Element) => { node.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true })); };
+
+  function render(call = vi.fn<ViewContext["call"]>(() => new Promise(() => {})), data: PlanOutput = demoPlan) {
+    content.replaceChildren();
+    plan.render(data, content, at(640, call));
+    return call;
+  }
+
+  it("shows each budget with its planned amount, Modifier and Supprimer, then the row to add one", () => {
+    render();
+
+    expect(rows(".budgets")).toEqual(demoPlan.budgets.map(b => [[b.name], [euros(b.plannedAmount)], ["Modifier", "Supprimer"]]));
+    expect(buttonIn(newRow(), "Nouveau budget")).toBeDefined();
+    expect(content.querySelector(".note")?.textContent).toContain("change aussi les mois passés");
+  });
+
+  it("keeps the row to add a budget when the plan has none", () => {
+    render(undefined, { ...demoPlan, budgets: [] });
+
+    expect(content.querySelectorAll(".budgets tbody tr")).toHaveLength(0);
+    expect(buttonIn(newRow(), "Nouveau budget")).toBeDefined();
+  });
+
+  it("changes a budget: both fields prefilled, sent with its identifier", () => {
+    const call = render();
+    buttonIn(rowOf(1), "Modifier").click();
+    expect(fieldsIn(rowOf(1)).map(f => plain(f.value))).toEqual(["Courses", "320,00"]);
+    const [name, plannedAmount] = fieldsIn(rowOf(1)) as [HTMLInputElement, HTMLInputElement];
+    name.value = " Alimentation ";
+    plannedAmount.value = "350";
+
+    buttonIn(rowOf(1), "Enregistrer").click();
+
+    expect(call).toHaveBeenCalledExactlyOnceWith(UPDATE_BUDGET, { month: "2027-03", budgetId: groceries.id, name: "Alimentation", plannedAmount: 350 });
+  });
+
+  it("keeps the name of the budget changed, even in another case", () => {
+    const call = render();
+    buttonIn(rowOf(1), "Modifier").click();
+    fieldsIn(rowOf(1))[0]!.value = "COURSES";
+
+    submitIn(rowOf(1));
+
+    expect(call).toHaveBeenCalledOnce();
+  });
+
+  it("adds a budget from empty fields", () => {
+    const call = render();
+    buttonIn(newRow(), "Nouveau budget").click();
+    expect(fieldsIn(newRow()).map(f => f.value)).toEqual(["", ""]);
+    const [name, plannedAmount] = fieldsIn(newRow()) as [HTMLInputElement, HTMLInputElement];
+    name.value = "Cadeaux";
+    plannedAmount.value = "40,50";
+
+    buttonIn(newRow(), "Enregistrer").click();
+
+    expect(call).toHaveBeenCalledExactlyOnceWith(CREATE_BUDGET, { month: "2027-03", name: "Cadeaux", plannedAmount: 40.5 });
+  });
+
+  it.each([
+    ["", "40", "Nom attendu."],
+    ["x".repeat(101), "40", "100 caractères au plus."],
+    ["sorties", "40", "Un autre budget porte déjà ce nom."],
+    ["Cadeaux", "0", "Montant attendu, plus que 0."],
+    ["Cadeaux", "-5", "Montant attendu, plus que 0."],
+  ])("refuses the name %j with the amount %j before any call", (name, plannedAmount, message) => {
+    const call = render();
+    buttonIn(newRow(), "Nouveau budget").click();
+    fieldsIn(newRow())[0]!.value = name;
+    fieldsIn(newRow())[1]!.value = plannedAmount;
+
+    submitIn(newRow());
+
+    expect(call).not.toHaveBeenCalled();
+    expect(newRow().querySelector(".field-error")?.textContent).toBe(message);
+  });
+
+  it.each([
+    ["", "Nom attendu."],
+    ["   ", "Nom attendu."],
+    ["sorties", "Un autre budget porte déjà ce nom."],
+    [" SORTIES ", "Un autre budget porte déjà ce nom."],
+  ])("refuses the name %j for a budget changed, before any call", (name, message) => {
+    const call = render();
+    buttonIn(rowOf(1), "Modifier").click();
+    fieldsIn(rowOf(1))[0]!.value = name;
+
+    submitIn(rowOf(1));
+
+    expect(call).not.toHaveBeenCalled();
+    expect(rowOf(1).querySelector(".field-error")?.textContent).toBe(message);
+  });
+
+  it("accepts a name of 100 characters", () => {
+    const call = render();
+    buttonIn(newRow(), "Nouveau budget").click();
+    fieldsIn(newRow())[0]!.value = "x".repeat(100);
+    fieldsIn(newRow())[1]!.value = "40";
+
+    submitIn(newRow());
+
+    expect(call).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    [3, "Supprimer « Sorties » ? Ses 3 réels saisis seront aussi supprimés."],
+    [1, "Supprimer « Sorties » ? Son réel saisi sera aussi supprimé."],
+    [0, "Supprimer « Sorties » ?"],
+  ])("says what goes with a budget deleted (%d actuals)", (actualsEntered, confirmation) => {
+    render(undefined, { ...demoPlan, budgets: [fuel, groceries, { ...outings, actualsEntered }] });
+
+    buttonIn(rowOf(2), "Supprimer").click();
+
+    expect(rowOf(2).querySelector(".confirmation")?.textContent).toBe(confirmation);
+  });
+
+  it("deletes a budget once confirmed", () => {
+    const call = render();
+    buttonIn(rowOf(2), "Supprimer").click();
+
+    buttonIn(rowOf(2), "Confirmer la suppression").click();
+
+    expect(call).toHaveBeenCalledExactlyOnceWith(DELETE_BUDGET, { month: "2027-03", budgetId: outings.id, actualsEntered: outings.actualsEntered });
+  });
+});
+
+describe("plan saved through startView", () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("redraws the plan from the server, the focus back on the button to add", async () => {
+    vi.stubGlobal("ResizeObserver", ManualResizeObserver);
+    const page = pageSkeleton();
+    const app = fakeApp();
+    const added = { ...demoPlan, budgets: [...demoPlan.budgets, { id: "00000000-0000-0000-0000-000000000009", name: "Cadeaux", plannedAmount: 40.5, actualsEntered: 0 }] };
+    app.callServerTool.mockResolvedValue(toolResult({ structuredContent: { ...added } }));
+    await startView(plan, asHostApp(app));
+    app.sendResult(toolResult({ structuredContent: { ...demoPlan } }));
+    const addRow = () => page.querySelector(".budgets tfoot tr")!;
+    [...addRow().querySelectorAll("button")].find(b => b.textContent === "Nouveau budget")!.click();
+    addRow().querySelectorAll("input")[0]!.value = "Cadeaux";
+    addRow().querySelectorAll("input")[1]!.value = "40,50";
+
+    [...addRow().querySelectorAll("button")].find(b => b.textContent === "Enregistrer")!.click();
+
+    await vi.waitFor(() => { expect(page.querySelectorAll(".budgets tbody tr")).toHaveLength(4); });
+    expect(app.callServerTool).toHaveBeenCalledWith({ name: "create_budget", arguments: { month: "2027-03", name: "Cadeaux", plannedAmount: 40.5 } });
+    expect(addRow().querySelector("input")).toBeNull();
+    expect(document.activeElement).toBe(addRow().querySelector(".new"));
+  });
+});
+
+describe("plan renamed through startView", () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("puts the focus back on Modifier of the budget renamed, wherever the new name sorts it", async () => {
+    vi.stubGlobal("ResizeObserver", ManualResizeObserver);
+    const [fuel, groceries, outings] = demoPlan.budgets as [PlanBudgetOutput, PlanBudgetOutput, PlanBudgetOutput];
+    const page = pageSkeleton();
+    const app = fakeApp();
+    // "Alimentation": first once sorted by the server, no longer second.
+    const renamed = { ...demoPlan, budgets: [{ ...groceries, name: "Alimentation" }, fuel, outings] };
+    app.callServerTool.mockResolvedValue(toolResult({ structuredContent: { ...renamed } }));
+    await startView(plan, asHostApp(app));
+    app.sendResult(toolResult({ structuredContent: { ...demoPlan } }));
+    const row = (index: number) => page.querySelectorAll(".budgets tbody tr")[index]!;
+    [...row(1).querySelectorAll("button")].find(b => b.textContent === "Modifier")!.click();
+    row(1).querySelectorAll("input")[0]!.value = "Alimentation";
+
+    [...row(1).querySelectorAll("button")].find(b => b.textContent === "Enregistrer")!.click();
+
+    await vi.waitFor(() => { expect(row(0).querySelector("td")?.textContent).toBe("Alimentation"); });
+    expect(document.activeElement).toBe(row(0).querySelector(".edit"));
   });
 });
 

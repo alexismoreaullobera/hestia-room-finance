@@ -46,6 +46,16 @@ public class FinanceDbContextModelTests
         Assert.Equal("decimal(18,2)", amount.GetColumnType());
     }
 
+    [Fact]
+    public void BudgetNames_HaveTheCollationOfTheDomain_WhateverTheDatabase()
+    {
+        // Case insensitive, accent sensitive: never the default collation of a database created elsewhere.
+        var name = Property(typeof(BudgetRow), nameof(BudgetRow.Name));
+
+        Assert.Equal("SQL_Latin1_General_CP1_CI_AS", name.GetCollation());
+        Assert.Equal(100, name.GetMaxLength());
+    }
+
     [Theory]
     [InlineData(nameof(RecurringLineRow.Kind))]
     [InlineData(nameof(RecurringLineRow.Frequency))]
@@ -99,6 +109,13 @@ public class FinanceDbContextModelTests
     public void CheckConstraints_AreInTheCreationScript(string constraint)
     {
         Assert.Contains($"CONSTRAINT [{constraint}] CHECK", CreateScript);
+    }
+
+    [Fact]
+    public void BudgetNames_AreUnique_InTheCreationScript()
+    {
+        // The last resort of the rule of PlanBudgets: two budgets never share a name.
+        Assert.Contains("CREATE UNIQUE INDEX [IX_Budgets_Name] ON [finance].[Budgets] ([Name])", CreateScript);
     }
 
     [Fact]

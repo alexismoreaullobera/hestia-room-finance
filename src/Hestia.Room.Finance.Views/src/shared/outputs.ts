@@ -88,6 +88,21 @@ export interface SubscriptionOutput {
   commitmentEndDate: string | null;
 }
 
+/** A budget of the plan; actualsEntered is the number of months an actual was entered for. */
+export interface PlanBudgetOutput {
+  id: string;
+  name: string;
+  plannedAmount: number;
+  actualsEntered: number;
+}
+
+/** show_plan (and get_plan). */
+export interface PlanOutput {
+  month: string;
+  /** By name. */
+  budgets: PlanBudgetOutput[];
+}
+
 /** show_subscriptions (and list_subscriptions). */
 export interface SubscriptionsOutput {
   month: string;

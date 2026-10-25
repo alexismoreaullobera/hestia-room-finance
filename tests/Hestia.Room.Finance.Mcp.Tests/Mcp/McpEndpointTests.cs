@@ -23,17 +23,20 @@ public partial class McpEndpointTests(McpServerFixture mcp)
         ("show_month_overview", "get_month_summary", "ui://finance/month-overview.html", "Vue : synthèse du mois"),
         ("show_cash_flow_forecast", "get_cash_flow_forecast", "ui://finance/cash-flow-forecast.html", "Vue : prévisionnel de trésorerie"),
         ("show_subscriptions", "list_subscriptions", "ui://finance/subscriptions.html", "Vue : abonnements"),
+        ("show_plan", "get_plan", "ui://finance/plan.html", "Vue : plan"),
     ];
 
-    private static readonly string[] DataTools = ["get_month_summary", "get_cash_flow_forecast", "list_recurring_lines", "list_subscriptions"];
+    private static readonly string[] DataTools = ["get_month_summary", "get_cash_flow_forecast", "list_recurring_lines", "list_subscriptions", "get_plan"];
 
-    private static readonly string[] InputTools = ["set_starting_balance", "set_budget_actual", "set_line_actual"];
+    private static readonly string[] InputTools =
+        ["set_starting_balance", "set_budget_actual", "set_line_actual", "create_budget", "update_budget", "delete_budget"];
 
     /// <summary>The input tools each view calls from its forms (literals too: renaming one must break the views).</summary>
     private static readonly Dictionary<string, string[]> InputToolsOfViews = new()
     {
         ["ui://finance/cash-flow-forecast.html"] = ["set_starting_balance"],
         ["ui://finance/month-overview.html"] = ["set_budget_actual", "set_line_actual"],
+        ["ui://finance/plan.html"] = ["create_budget", "update_budget", "delete_budget"],
     };
 
     public static TheoryData<string, string, string> ViewToolsViewsAndTitles =>

@@ -1,17 +1,23 @@
+using Hestia.Room.Finance.Infrastructure;
 using Hestia.Room.Finance.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 
 /// <summary>
 /// One SQL Server container and one in-memory MCP server for every /mcp test of the run. The server migrates its
-/// database and seeds the demo plan at startup (Development). The tests share it: the input tools write only to months
-/// years after the demo plan, which no other test reads (see <see cref="InputToolsEndpointTests"/>).
+/// database and seeds the demo plan at startup (Development). The tests share it: the input tests write only to months
+/// years after the demo plan, and clear them after each test (<see cref="WrittenRows.DeleteTestWritesAsync"/>).
 /// </summary>
 public sealed class McpServerFixture : IAsyncLifetime
 {
     private readonly SqlServerFixture _sqlServer = new();
 
     public DevelopmentMcpServerFactory Server { get; private set; } = null!;
+
+    /// <summary>The budgets of the demo seeded at startup: the only ones the cleanup of the input tests keeps.</summary>
+    public IReadOnlyList<Guid> DemoBudgetIds { get; private set; } = [];
 
     public async ValueTask InitializeAsync()
     {
@@ -20,6 +26,10 @@ public sealed class McpServerFixture : IAsyncLifetime
         // Started here, not lazily by the first test: a failing startup (migrations, seed) fails the fixture once,
         // with its own error, instead of every test in turn.
         Server.StartServer();
+
+        await using var scope = Server.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
+        DemoBudgetIds = await context.Budgets.Select(b => b.Id).ToListAsync();
     }
 
     public async ValueTask DisposeAsync()

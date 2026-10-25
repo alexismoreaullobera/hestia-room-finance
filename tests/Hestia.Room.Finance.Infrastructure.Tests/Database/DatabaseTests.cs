@@ -94,6 +94,8 @@ public class DatabaseTests(SqlServerFixture sqlServer)
     [Theory]
     [InlineData("INSERT INTO finance.Budgets (Id, Name, PlannedAmount) VALUES (NEWID(), 'Courses', -200)",
         "CK_Budgets_PlannedAmount")]
+    [InlineData("INSERT INTO finance.Budgets (Id, Name, PlannedAmount) VALUES (NEWID(), 'Courses', 1000000000)",
+        "CK_Budgets_PlannedAmount")]
     [InlineData("INSERT INTO finance.RecurringLines (Id, Kind, Name, Amount, Frequency, DayOfMonth, StartDate, Category, IsSubscription) "
         + "VALUES (NEWID(), 'Expense', 'Loyer', 650, 'Monthly', 32, '2025-01-01', 'Housing', 0)",
         "CK_RecurringLines_DayOfMonth")]

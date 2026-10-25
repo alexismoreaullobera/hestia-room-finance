@@ -8,9 +8,14 @@ namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 /// The budgets and lines are the ones of the demo, still running then.
 /// </summary>
 [Collection(McpServerCollection.Name)]
-public class ActualsInputToolsEndpointTests(McpServerFixture mcp)
+public class ActualsInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetime
 {
     private readonly McpTestClient _mcp = new(mcp.Server.CreateClient());
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    /// <summary>After each test, its months cleared: the other classes of the collection never see these writes.</summary>
+    public async ValueTask DisposeAsync() => await WrittenRows.DeleteTestWritesAsync(mcp);
 
     public static TheoryData<string> Tools => ["set_budget_actual", "set_line_actual"];
 
@@ -132,8 +137,8 @@ public class ActualsInputToolsEndpointTests(McpServerFixture mcp)
         { "set_budget_actual", """{ "month": "2032-05", "budgetId": "BUDGET", "actualAmount": -1 }""", "0 or more" },
         { "set_budget_actual", """{ "month": "2032-05", "budgetId": "BUDGET", "actualAmount": 12.345 }""", "two decimals" },
         { "set_budget_actual", """{ "month": "2032-05", "budgetId": "BUDGET", "actualAmount": 1000000000 }""", "999999999.99" },
-        { "set_budget_actual", """{ "month": "2032-05", "budgetId": "LINE", "actualAmount": 10 }""", "No budget with this identifier in 2032-05." },
-        { "set_budget_actual", """{ "month": "2032-05", "budgetId": "LINE", "actualAmount": null }""", "No budget with this identifier in 2032-05." },
+        { "set_budget_actual", """{ "month": "2032-05", "budgetId": "LINE", "actualAmount": 10 }""", "No budget with this identifier in the plan." },
+        { "set_budget_actual", """{ "month": "2032-05", "budgetId": "LINE", "actualAmount": null }""", "No budget with this identifier in the plan." },
         { "set_budget_actual", """{ "month": "2032-13", "budgetId": "BUDGET", "actualAmount": 10 }""", "YYYY-MM" },
         { "set_budget_actual", """{ "month": "2032-05", "budgetId": "not-a-guid", "actualAmount": 10 }""", "An error occurred invoking 'set_budget_actual'." },
         { "set_budget_actual", """{ "month": "2032-05", "budgetId": "BUDGET" }""", "An error occurred invoking 'set_budget_actual'." },

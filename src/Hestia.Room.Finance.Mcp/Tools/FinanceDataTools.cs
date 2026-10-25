@@ -89,6 +89,26 @@ public sealed class FinanceDataTools
         return Result(output, output.Describe());
     }
 
+    [McpServerTool(Name = "get_plan", Title = "Plan", ReadOnly = true, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true, OutputSchemaType = typeof(PlanOutput))]
+    [Description("The plan itself as it stands for a month: the budgets (variable expenses planned every month), with "
+        + "their planned amount and the number of months an actual was entered for.")]
+    public static Task<CallToolResult> GetPlan(
+        FinancePlanReader reader,
+        FinanceClock clock,
+        [Description(MonthArgument.Description)] string? month = null,
+        CancellationToken cancellationToken = default) =>
+        PlanAsync(reader, MonthArgument.Resolve(month, clock), cancellationToken);
+
+    /// <summary>The result of get_plan for a month already resolved: also what an input tool of the plan returns.</summary>
+    internal static async Task<CallToolResult> PlanAsync(FinancePlanReader reader, YearMonth month, CancellationToken cancellationToken)
+    {
+        var financeMonth = await reader.LoadMonthAsync(month, cancellationToken);
+        var actualsByBudget = await reader.CountActualsByBudgetAsync(cancellationToken);
+        var output = PlanOutput.From(financeMonth, actualsByBudget);
+        return Result(output, output.Describe());
+    }
+
     private static CallToolResult Result<T>(T output, string summary) => new()
     {
         // Text for the model and for hosts without UI; structured content matching the advertised output schema,

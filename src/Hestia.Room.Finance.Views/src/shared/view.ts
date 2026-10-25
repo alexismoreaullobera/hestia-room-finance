@@ -42,6 +42,9 @@ export interface ViewDefinition<T> {
   render: (data: T, content: HTMLElement, context: ViewContext) => void;
 }
 
+/** What a view shows while the user is in the middle of an input: a form, or a row waiting for a confirmation. */
+const IN_PROGRESS = "form, .confirming";
+
 /** The ids every view page has (views/*.html), checked on the built views by a C# test. */
 export const PAGE_IDS = ["label", "previous", "month", "next", "status", "content"] as const;
 
@@ -108,10 +111,12 @@ export async function startView<T extends { month: string }>(
   }
 
   // Drawn again when the width changes (window resized, browser zoom): only the width, since a new rendering
-  // changes the height, which would otherwise trigger another rendering. Never while a form is open: a rendering
-  // rebuilds the content and would close it, losing what was typed; the next change of width redraws.
+  // changes the height, which would otherwise trigger another rendering. Never while the user is in the middle of an
+  // input (a form open, or a deletion to confirm): a rendering rebuilds the content and would close it. Opening one
+  // can itself change the width (a taller content shows a scrollbar), which closed a confirmation at once. The next
+  // change of width redraws.
   new ResizeObserver(() => {
-    if (lastData !== null && content.clientWidth !== renderedWidth && content.querySelector("form") === null) {
+    if (lastData !== null && content.clientWidth !== renderedWidth && content.querySelector(IN_PROGRESS) === null) {
       render(lastData);
     }
   }).observe(content);

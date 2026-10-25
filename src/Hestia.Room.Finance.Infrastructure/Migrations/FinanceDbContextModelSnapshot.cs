@@ -53,7 +53,8 @@ namespace Hestia.Room.Finance.Infrastructure.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("SQL_Latin1_General_CP1_CI_AS");
 
                     b.Property<decimal>("PlannedAmount")
                         .HasPrecision(18, 2)
@@ -61,9 +62,13 @@ namespace Hestia.Room.Finance.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Budgets_Name");
+
                     b.ToTable("Budgets", "finance", t =>
                         {
-                            t.HasCheckConstraint("CK_Budgets_PlannedAmount", "[PlannedAmount] > 0");
+                            t.HasCheckConstraint("CK_Budgets_PlannedAmount", "[PlannedAmount] > 0 AND [PlannedAmount] <= 999999999.99");
                         });
                 });
 

@@ -2,11 +2,7 @@
 .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
 tr.total td { font-weight: 600; }
 
-/* The tables of actuals: each row editable in place (option A), with the amount form of the kit. */
-td.action { width: 1%; text-align: right; }
-td .detail { display: block; color: var(--muted); font-size: 12px; }
-tr.editing td { background: var(--surface); }
-tr.editing .amount-form { max-width: 360px; }
+/* The tables of actuals (editable tables of the kit, option A): the badge of a line that did not go as planned. */
 .badge {
   display: inline-block;
   margin-left: 6px;

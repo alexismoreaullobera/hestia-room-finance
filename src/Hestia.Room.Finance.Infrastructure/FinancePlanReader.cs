@@ -11,6 +11,16 @@ namespace Hestia.Room.Finance.Infrastructure;
 /// </summary>
 public sealed class FinancePlanReader(FinanceDbContext context)
 {
+    /// <summary>
+    /// For each budget with actuals, the number of months they were entered for: what deleting it would also delete.
+    /// A budget without any actual is absent (0).
+    /// </summary>
+    public async Task<IReadOnlyDictionary<Guid, int>> CountActualsByBudgetAsync(CancellationToken cancellationToken = default) =>
+        await context.BudgetActuals.AsNoTracking()
+            .GroupBy(actual => actual.BudgetId)
+            .Select(group => new { BudgetId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(entry => entry.BudgetId, entry => entry.Count, cancellationToken);
+
     public async Task<FinanceMonth> LoadMonthAsync(YearMonth month, CancellationToken cancellationToken = default)
     {
         var firstDay = month.FirstDay;

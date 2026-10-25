@@ -7,9 +7,14 @@ namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 /// month, years after the demo plan, so the reads of the other tests and of the other cases never see these writes.
 /// </summary>
 [Collection(McpServerCollection.Name)]
-public class InputToolsEndpointTests(McpServerFixture mcp)
+public class InputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetime
 {
     private readonly McpTestClient _mcp = new(mcp.Server.CreateClient());
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    /// <summary>After each test, its months cleared: the other classes of the collection never see these writes.</summary>
+    public async ValueTask DisposeAsync() => await WrittenRows.DeleteTestWritesAsync(mcp);
 
     [Fact]
     public async Task ToolsList_OffersSetStartingBalanceToTheViewsOnly_WithoutOpeningAView()

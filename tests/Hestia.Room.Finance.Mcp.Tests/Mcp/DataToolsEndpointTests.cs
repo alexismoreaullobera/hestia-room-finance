@@ -20,7 +20,7 @@ public class DataToolsEndpointTests(McpServerFixture mcp)
     private static readonly YearMonth Previous = Current.AddMonths(-1);
     private static readonly DemoPlan Demo = DemoPlan.For(Current);
 
-    public static TheoryData<string> DataTools => ["get_month_summary", "get_cash_flow_forecast", "list_recurring_lines", "list_subscriptions"];
+    public static TheoryData<string> DataTools => ["get_month_summary", "get_cash_flow_forecast", "list_recurring_lines", "list_subscriptions", "get_plan"];
 
     private readonly McpTestClient _mcp = new(mcp.Server.CreateClient());
 
@@ -99,6 +99,19 @@ public class DataToolsEndpointTests(McpServerFixture mcp)
         Assert.Equal(
             expected.Lines.Select(l => (l.Name, l.Actual, l.Status.ToString())),
             content["lines"]!.AsArray().Select(l => ((string)l!["name"]!, (decimal)l["actual"]!, (string)l["status"]!)));
+    }
+
+    [Fact]
+    public async Task GetPlan_GivesTheBudgetsOfTheDemo_WithTheMonthsTheirActualsWereEnteredFor()
+    {
+        var budgets = (await _mcp.CallToolAsync("get_plan"))["structuredContent"]!["budgets"]!.AsArray();
+
+        // By name, compared by name (the demo built here has identifiers of its own): the demo enters an actual for
+        // every budget on each of its three past months.
+        var expected = Demo.Budgets
+            .OrderBy(b => b.Name, StringComparer.Create(CultureInfo.GetCultureInfo("fr-FR"), ignoreCase: true))
+            .Select(b => (b.Name, b.PlannedAmount, Demo.BudgetActuals.Count(a => a.BudgetId == b.Id)));
+        Assert.Equal(expected, budgets.Select(b => ((string)b!["name"]!, (decimal)b["plannedAmount"]!, (int)b["actualsEntered"]!)));
     }
 
     [Fact]

@@ -1,3 +1,4 @@
+using Hestia.Room.Finance.Domain;
 using Hestia.Room.Finance.Infrastructure.Rows;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -20,7 +21,7 @@ internal sealed class RecurringLineRowConfiguration : IEntityTypeConfiguration<R
         // Identifiers are created by the application (Guid v7), never by the database.
         line.Property(l => l.Id).ValueGeneratedNever();
 
-        line.Property(l => l.Name).HasMaxLength(100);
+        line.Property(l => l.Name).HasMaxLength(NameLimit.MaxLength);
 
         // Enums stored as text: readable in SQL, and robust to a reordering of the enum members.
         line.Property(l => l.Kind).HasConversion<string>().HasMaxLength(20);

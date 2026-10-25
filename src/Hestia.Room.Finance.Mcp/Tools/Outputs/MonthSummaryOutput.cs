@@ -31,7 +31,7 @@ public sealed record MonthSummaryOutput(
             SummaryFigures.From(month.PlannedSummary()),
             actual,
             [.. month.Budgets
-                .OrderBy(budget => budget.Name, StringComparer.Ordinal)
+                .OrderBy(budget => budget.Name, NameOrder)
                 .ThenBy(budget => budget.Id)
                 .Select(budget => BudgetActualOutput.From(budget, actualByBudget.GetValueOrDefault(budget.Id)))],
             [.. month.Occurrences.Select(occurrence => LineActualOutput.From(occurrence, overrideByLine.GetValueOrDefault(occurrence.Line.Id)))]);
@@ -66,7 +66,7 @@ public sealed record BudgetActualOutput(
         Cents(actual?.Amount ?? budget.PlannedAmount),
         actual is not null);
 
-    internal string Describe() => $"« {Name} » {Euros(Actual)} pour {Euros(Planned)} prévus";
+    internal string Describe() => $"{Quoted(Name)} {Euros(Actual)} pour {Euros(Planned)} prévus";
 }
 
 /// <remarks>Enums as text, by explicit converters (see <see cref="RecurringLineOutput"/>).</remarks>
@@ -94,8 +94,8 @@ public sealed record LineActualOutput(
 
     // Names between quotes: a name typed by the user, read by the model, stays a name and never blends into the sentence.
     internal string Describe() => Status == LineActualStatus.Skipped
-        ? $"« {Name} » : n'a pas eu lieu"
-        : $"« {Name} » {Euros(Actual)} pour {Euros(Planned)} prévus";
+        ? $"{Quoted(Name)} : n'a pas eu lieu"
+        : $"{Quoted(Name)} {Euros(Actual)} pour {Euros(Planned)} prévus";
 }
 
 /// <summary>
