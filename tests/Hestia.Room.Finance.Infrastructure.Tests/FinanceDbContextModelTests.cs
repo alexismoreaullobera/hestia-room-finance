@@ -46,11 +46,13 @@ public class FinanceDbContextModelTests
         Assert.Equal("decimal(18,2)", amount.GetColumnType());
     }
 
-    [Fact]
-    public void BudgetNames_HaveTheCollationOfTheDomain_WhateverTheDatabase()
+    [Theory]
+    [InlineData(typeof(BudgetRow), nameof(BudgetRow.Name))]
+    [InlineData(typeof(RecurringLineRow), nameof(RecurringLineRow.Name))]
+    public void Names_HaveTheCollationOfTheDomain_WhateverTheDatabase(Type rowType, string property)
     {
         // Case insensitive, accent sensitive: never the default collation of a database created elsewhere.
-        var name = Property(typeof(BudgetRow), nameof(BudgetRow.Name));
+        var name = Property(rowType, property);
 
         Assert.Equal("SQL_Latin1_General_CP1_CI_AS", name.GetCollation());
         Assert.Equal(100, name.GetMaxLength());
@@ -99,6 +101,7 @@ public class FinanceDbContextModelTests
     [InlineData("CK_RecurringLines_Amount")]
     [InlineData("CK_RecurringLines_DayOfMonth")]
     [InlineData("CK_RecurringLines_AnchorMonth")]
+    [InlineData("CK_RecurringLines_EndDate")]
     [InlineData("CK_Budgets_PlannedAmount")]
     [InlineData("CK_MonthPlans_Month")]
     [InlineData("CK_MonthPlans_StartingBalance")]
@@ -111,11 +114,13 @@ public class FinanceDbContextModelTests
         Assert.Contains($"CONSTRAINT [{constraint}] CHECK", CreateScript);
     }
 
-    [Fact]
-    public void BudgetNames_AreUnique_InTheCreationScript()
+    [Theory]
+    [InlineData("CREATE UNIQUE INDEX [IX_Budgets_Name] ON [finance].[Budgets] ([Name])")]
+    [InlineData("CREATE UNIQUE INDEX [IX_RecurringLines_Name] ON [finance].[RecurringLines] ([Name])")]
+    public void Names_AreUnique_InTheCreationScript(string index)
     {
-        // The last resort of the rule of PlanBudgets: two budgets never share a name.
-        Assert.Contains("CREATE UNIQUE INDEX [IX_Budgets_Name] ON [finance].[Budgets] ([Name])", CreateScript);
+        // The last resort of the rules of PlanBudgets and PlanLines: two budgets, or two lines, never share a name.
+        Assert.Contains(index, CreateScript);
     }
 
     [Fact]

@@ -17,9 +17,7 @@ internal sealed class BudgetRowConfiguration : IEntityTypeConfiguration<BudgetRo
 
         budget.HasKey(b => b.Id);
         budget.Property(b => b.Id).ValueGeneratedNever();
-        // Case insensitive and accent sensitive, like the domain ("Épargne" and "Epargne" are two names), whatever the
-        // default collation of the database: on Azure SQL it is chosen when the database is created.
-        budget.Property(b => b.Name).HasMaxLength(NameLimit.MaxLength).UseCollation("SQL_Latin1_General_CP1_CI_AS");
+        budget.Property(b => b.Name).HasMaxLength(NameLimit.MaxLength).UseCollation(NameColumn.Collation);
         // Two budgets never share a name: checked by the domain (PlanBudgets), and here in the last resort.
         budget.HasIndex(b => b.Name).IsUnique().HasDatabaseName(NameIndex);
     }

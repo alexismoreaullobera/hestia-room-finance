@@ -21,6 +21,21 @@ public class FinancePlanReaderTests(SqlServerFixture sqlServer)
     private RecurringLine[] AllLines => [_rent, _endedInMarch, _endingOnAprilFirst, _startingOnAprilLast, _startingInMay];
 
     [Fact]
+    public async Task LoadPlan_HoldsEveryLine_EndedAndFutureOnesIncluded_AndEveryBudget()
+    {
+        var options = await SeedAsync();
+        await using var context = new FinanceDbContext(options);
+
+        var plan = await new FinancePlanReader(context).LoadPlanAsync(Token);
+
+        // Seen through the rules of the plan: every line exists, and its name is taken.
+        Assert.All(AllLines, line => plan.Lines.EnsureExists(line.Id));
+        Assert.Throws<NameTakenException>(() => plan.Lines.Create(Expense("salle de sport", 30m)));
+        Assert.Throws<NameTakenException>(() => plan.Lines.Create(Expense("STREAMING", 30m)));
+        plan.Budgets.EnsureExists(_groceries.Id);
+    }
+
+    [Fact]
     public async Task LoadMonth_ReturnsTheLinesActiveDuringTheMonth()
     {
         var month = await LoadAprilAsync();

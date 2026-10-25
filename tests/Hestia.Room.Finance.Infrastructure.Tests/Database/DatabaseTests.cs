@@ -99,6 +99,13 @@ public class DatabaseTests(SqlServerFixture sqlServer)
     [InlineData("INSERT INTO finance.RecurringLines (Id, Kind, Name, Amount, Frequency, DayOfMonth, StartDate, Category, IsSubscription) "
         + "VALUES (NEWID(), 'Expense', 'Loyer', 650, 'Monthly', 32, '2025-01-01', 'Housing', 0)",
         "CK_RecurringLines_DayOfMonth")]
+    // The bounds of a recurring line: its amount, its end never before its start.
+    [InlineData("INSERT INTO finance.RecurringLines (Id, Kind, Name, Amount, Frequency, DayOfMonth, StartDate, Category, IsSubscription) "
+        + "VALUES (NEWID(), 'Expense', 'Loyer', 1000000000, 'Monthly', 5, '2025-01-01', 'Housing', 0)",
+        "CK_RecurringLines_Amount")]
+    [InlineData("INSERT INTO finance.RecurringLines (Id, Kind, Name, Amount, Frequency, DayOfMonth, StartDate, EndDate, Category, IsSubscription) "
+        + "VALUES (NEWID(), 'Expense', 'Loyer', 650, 'Monthly', 5, '2025-01-01', '2024-12-31', 'Housing', 0)",
+        "CK_RecurringLines_EndDate")]
     [InlineData("INSERT INTO finance.MonthPlans (Month, StartingBalance) VALUES ('2026-04-15', 0)",
         "CK_MonthPlans_Month")]
     // The amount bound of the domain (999 999 999,99 either way) on the amounts the user types.
