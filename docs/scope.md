@@ -94,7 +94,7 @@ Every view tool also returns a **self-sufficient text summary** (model and voice
 |---|---|---|
 | **Data** (read-only) | `get_month_summary`, `get_cash_flow_forecast`, `list_recurring_lines`, `list_subscriptions` | The agent |
 | **Views** | `show_month_overview`, `show_cash_flow_forecast`, `show_subscriptions` | The agent and the hosts |
-| **Input** (`Visibility = App`) | `set_starting_balance` (T9); `set_budget_actual` and `set_line_actual`, the actuals of the month (T10); create / update / delete recurring lines, subscriptions and budgets (T11) | The widgets only, not the model |
+| **Input** (`Visibility = App`) | `set_starting_balance` (T9); `set_budget_actual` and `set_line_actual`, the actuals of the month (T10); `create_budget`, `update_budget` and `delete_budget` in the plan view (T11); create / update / end / delete recurring lines and subscriptions (T12) | The widgets only, not the model |
 
 The agent has **no write access** in the v1. The visibility only asks the MCP Apps hosts to hide the input tools from the model (a host without MCP Apps support offers them to its model): it is not access control (authentication before any deployment, see #2).
 
