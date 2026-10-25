@@ -34,8 +34,8 @@ function positive(value: number): string | null {
 /** The two fields of a budget, prefilled with the budget changed, empty for a new one. */
 function budgetFields(budgets: readonly PlanBudgetOutput[], budget: PlanBudgetOutput | null): Field[] {
   return [
-    { kind: "text", label: "Nom", value: budget?.name ?? "", check: nameCheck(budgets, budget?.id ?? null) },
-    { kind: "amount", label: "Par mois", value: budget?.plannedAmount ?? null, check: positive },
+    { kind: "text", name: "name", label: "Nom", value: budget?.name ?? "", check: nameCheck(budgets, budget?.id ?? null) },
+    { kind: "amount", name: "plannedAmount", label: "Par mois", value: budget?.plannedAmount ?? null, check: positive },
   ];
 }
 
@@ -56,7 +56,7 @@ function budgetsTable({ month, budgets }: PlanOutput, call: ViewContext["call"])
       ...closing,
       title: budget.name,
       fields: budgetFields(budgets, budget),
-      submit: ([name, plannedAmount]) => call(UPDATE_BUDGET, { month, budgetId: budget.id, name, plannedAmount }),
+      submit: ({ name, plannedAmount }) => call(UPDATE_BUDGET, { month, budgetId: budget.id, name, plannedAmount }),
     }),
     remove: {
       confirmation: deleteConfirmation(budget),
@@ -69,7 +69,7 @@ function budgetsTable({ month, budgets }: PlanOutput, call: ViewContext["call"])
       ...closing,
       title: "Nouveau budget",
       fields: budgetFields(budgets, null),
-      submit: ([name, plannedAmount]) => call(CREATE_BUDGET, { month, name, plannedAmount }),
+      submit: ({ name, plannedAmount }) => call(CREATE_BUDGET, { month, name, plannedAmount }),
     }),
   });
 }
