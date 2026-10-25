@@ -50,6 +50,7 @@ function deleteConfirmation({ name, actualsEntered }: PlanBudgetOutput): string 
 function budgetsTable({ month, budgets }: PlanOutput, call: ViewContext["call"]): HTMLElement[] {
   const headers = [{ text: "Budget" }, { text: "Par mois", amount: true }];
   return editableTable("budgets", "Budgets", headers, budgets, (budget): EditableRow => ({
+    key: budget.id,
     cells: () => [element("td", { text: budget.name }), amount(budget.plannedAmount, "td")],
     form: (closing: Closing) => recordForm({
       ...closing,
@@ -57,7 +58,11 @@ function budgetsTable({ month, budgets }: PlanOutput, call: ViewContext["call"])
       fields: budgetFields(budgets, budget),
       submit: ([name, plannedAmount]) => call(UPDATE_BUDGET, { month, budgetId: budget.id, name, plannedAmount }),
     }),
-    remove: { confirmation: deleteConfirmation(budget), run: () => call(DELETE_BUDGET, { month, budgetId: budget.id }) },
+    remove: {
+      confirmation: deleteConfirmation(budget),
+      // The number of actuals the confirmation announced: the server refuses when it changed meanwhile.
+      run: () => call(DELETE_BUDGET, { month, budgetId: budget.id, actualsEntered: budget.actualsEntered }),
+    },
   }), {
     label: "Nouveau budget",
     form: (closing: Closing) => recordForm({

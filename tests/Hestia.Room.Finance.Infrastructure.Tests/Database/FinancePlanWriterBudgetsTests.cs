@@ -78,15 +78,16 @@ public class FinancePlanWriterBudgetsTests(SqlServerFixture sqlServer)
     [Theory]
     [InlineData("Courses")]
     [InlineData("courses")]
-    public async Task AddBudget_UnderANameAlreadyUsed_IsRefusedByTheDatabase(string name)
+    public async Task AddBudget_UnderANameAlreadyUsed_IsRefusedByTheDatabase_AsANameTaken(string name)
     {
-        // Outside the domain, as a second request racing the first: the unique index refuses, whatever the case.
+        // Outside the domain, as a second request racing the first: the unique index refuses, whatever the case, and
+        // the writer says so in the terms of the domain.
         var options = await SeedAsync();
 
-        var error = await Assert.ThrowsAsync<DbUpdateException>(() => WriteAsync(options, w => w.AddBudgetAsync(NewBudget(name, 50m), Token)));
+        var error = await Assert.ThrowsAsync<NameTakenException>(() => WriteAsync(options, w => w.AddBudgetAsync(NewBudget(name, 50m), Token)));
 
         // 2601: duplicate key in a unique index.
-        Assert.Equal(2601, Assert.IsType<SqlException>(error.InnerException).Number);
+        Assert.Equal(2601, Assert.IsType<SqlException>(Assert.IsType<DbUpdateException>(error.InnerException).InnerException).Number);
     }
 
     [Fact]

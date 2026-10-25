@@ -51,7 +51,7 @@ public class BudgetInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetim
     [Theory]
     [InlineData("create_budget", new[] { "month", "name", "plannedAmount" })]
     [InlineData("update_budget", new[] { "month", "budgetId", "name", "plannedAmount" })]
-    [InlineData("delete_budget", new[] { "month", "budgetId" })]
+    [InlineData("delete_budget", new[] { "month", "budgetId", "actualsEntered" })]
     public async Task ToolsList_RequiresEveryArgument(string name, string[] arguments)
     {
         var schema = (await ToolAsync(name))["inputSchema"]!;
@@ -104,7 +104,7 @@ public class BudgetInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetim
         await CallAsync("set_budget_actual", new JsonObject { ["budgetId"] = id, ["actualAmount"] = 12m }, month: "2031-11");
         Assert.Equal(1, (int)Budget(await _mcp.CallToolAsync("get_plan", MonthOnly()), $"{WrittenRows.TestBudgetPrefix}Cadeaux")["actualsEntered"]!);
 
-        var deleted = await CallAsync("delete_budget", new JsonObject { ["budgetId"] = id });
+        var deleted = await CallAsync("delete_budget", new JsonObject { ["budgetId"] = id, ["actualsEntered"] = 1 });
 
         Assert.DoesNotContain(deleted["structuredContent"]!["budgets"]!.AsArray(), b => (string?)b!["id"] == id);
         var summary = (await _mcp.CallToolAsync("get_month_summary", new JsonObject { ["month"] = "2031-11" }))["structuredContent"]!;
@@ -126,9 +126,9 @@ public class BudgetInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetim
         { "create_budget", """{ "month": "2031-10", "plannedAmount": 10 }""", "An error occurred invoking 'create_budget'." },
         { "update_budget", """{ "month": "2031-10", "budgetId": "MINE", "name": "DEMO", "plannedAmount": 10 }""", "Another budget already has this name." },
         { "update_budget", """{ "month": "2031-10", "budgetId": "MINE", "name": "Test budget x", "plannedAmount": 0 }""", "Invalid budget" },
-        { "update_budget", """{ "month": "2031-10", "budgetId": "00000000-0000-0000-0000-000000000099", "name": "Test budget x", "plannedAmount": 10 }""", "No budget with this identifier in 2031-10." },
-        { "delete_budget", """{ "month": "2031-10", "budgetId": "00000000-0000-0000-0000-000000000099" }""", "No budget with this identifier in 2031-10." },
-        { "delete_budget", """{ "month": "2031-10", "budgetId": "not-a-guid" }""", "An error occurred invoking 'delete_budget'." },
+        { "update_budget", """{ "month": "2031-10", "budgetId": "00000000-0000-0000-0000-000000000099", "name": "Test budget x", "plannedAmount": 10 }""", "No budget with this identifier in the plan." },
+        { "delete_budget", """{ "month": "2031-10", "budgetId": "00000000-0000-0000-0000-000000000099", "actualsEntered": 0 }""", "No budget with this identifier in the plan." },
+        { "delete_budget", """{ "month": "2031-10", "budgetId": "not-a-guid", "actualsEntered": 0 }""", "An error occurred invoking 'delete_budget'." },
     };
 
     [Theory]

@@ -642,7 +642,7 @@ describe("plan", () => {
 
     buttonIn(rowOf(2), "Confirmer la suppression").click();
 
-    expect(call).toHaveBeenCalledExactlyOnceWith(DELETE_BUDGET, { month: "2027-03", budgetId: outings.id });
+    expect(call).toHaveBeenCalledExactlyOnceWith(DELETE_BUDGET, { month: "2027-03", budgetId: outings.id, actualsEntered: outings.actualsEntered });
   });
 });
 

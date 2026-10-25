@@ -8,8 +8,6 @@ public sealed class PlanBudgets(IEnumerable<Budget> budgets)
 {
     private readonly IReadOnlyList<Budget> _budgets = budgets.ToList().AsReadOnly();
 
-    public IReadOnlyList<Budget> Budgets => _budgets;
-
     /// <summary>A new budget, under a name no other budget uses.</summary>
     public Budget Create(Guid id, string name, decimal plannedAmount)
     {

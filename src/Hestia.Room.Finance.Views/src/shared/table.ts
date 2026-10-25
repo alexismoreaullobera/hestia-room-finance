@@ -20,6 +20,8 @@ export interface RowRemoval {
 
 /** What an editable row shows and how it is entered. */
 export interface EditableRow {
+  /** What identifies the item in its table (its id): the focus finds its row again after a redraw, wherever it moved. */
+  key: string;
   /** The cells before the buttons: the row as read. */
   cells: () => HTMLElement[];
   /** The form that replaces the row, opened by Modifier. */
@@ -48,21 +50,27 @@ function focusOn(selector: string): void {
   document.querySelector<HTMLElement>(selector)?.focus();
 }
 
-/** A row on the whole width of its table: a form, or a confirmation. */
-function wholeWidth(node: HTMLElement, columns: number, ...children: HTMLElement[]): void {
+/** The id of the row of an item: unique in the view, as the class of a table is. */
+const rowId = (table: string, key: string) => `${table}-${key}`;
+
+/** A row on the whole width of its table: a form, or a confirmation. Returns its only cell. */
+function wholeWidth(node: HTMLElement, columns: number, ...children: HTMLElement[]): HTMLElement {
   const cell = element("td", {}, ...children);
   cell.colSpan = columns;
   node.replaceChildren(cell);
+  return cell;
 }
 
 /**
  * A row of an editable table: its cells, Modifier (the row turns into the form, on the whole width of the table) and,
  * when the item can be deleted, Supprimer (the row turns into a confirmation). Annuler or Escape gives the row back.
  */
-export function editableRow(table: string, index: number, columns: number, { cells, form, remove }: EditableRow): HTMLElement {
-  const node = element("tr");
-  // After a save the view is redrawn, this row with it: the focus goes to the Modifier button of the same row.
-  const afterShown = () => { focusOn(`.${table} tbody tr:nth-child(${index + 1}) .edit`); };
+export function editableRow(table: string, columns: number, { key, cells, form, remove }: EditableRow): HTMLElement {
+  const id = rowId(table, key);
+  const node = element("tr", { attributes: { id } });
+  // After a save the view is redrawn, this row with it: the focus goes to the Modifier button of the same item, found by
+  // its id (a rename may move it in the sorted list).
+  const afterShown = () => { document.getElementById(id)?.querySelector<HTMLElement>(".edit")?.focus(); };
 
   function showValue(focus: "edit" | "remove" | null = null): void {
     const edit = button("Modifier", "edit");
@@ -107,15 +115,14 @@ export function editableRow(table: string, index: number, columns: number, { cel
       });
     });
     back.addEventListener("click", () => { showValue("remove"); });
-    node.addEventListener("keydown", function escape(event) {
-      if (event.key !== "Escape" || busy) return;
-      node.removeEventListener("keydown", escape);
-      showValue("remove");
-    });
     node.classList.add("confirming");
-    wholeWidth(node, columns,
+    const cell = wholeWidth(node, columns,
       element("p", { className: "confirmation", attributes: { role: "alert" }, text: confirmation }),
       element("div", { className: "actions" }, confirm, back));
+    // On the cell of the confirmation, gone with it: never a listener left on the row once the confirmation is closed.
+    cell.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !busy) showValue("remove");
+    });
     // The safe answer first: Enter on the focused button never deletes by mistake.
     back.focus();
   }
@@ -163,7 +170,7 @@ export function editableTable<T>(
       element("thead", {}, element("tr", {},
         ...headers.map(header => element("th", { className: header.amount ? "amount" : "", text: header.text })),
         element("th"))),
-      element("tbody", {}, ...items.map((item, index) => editableRow(className, index, columns, rowOf(item)))),
+      element("tbody", {}, ...items.map(item => editableRow(className, columns, rowOf(item)))),
       ...(newRow ? [element("tfoot", {}, newItemRow(className, columns, newRow))] : [])),
   ];
 }

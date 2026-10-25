@@ -6,6 +6,10 @@ tr.editing td,
 tr.confirming td { background: var(--surface); }
 tr.editing .amount-form { max-width: 360px; }
 .confirmation { margin: 0 0 6px; }
+/* A long name without spaces wraps instead of widening the table past the view. */
+td:not(.action),
+.amount-form .title,
+.confirmation { overflow-wrap: anywhere; }
 button.remove,
 button.confirm,
 button.cancel,

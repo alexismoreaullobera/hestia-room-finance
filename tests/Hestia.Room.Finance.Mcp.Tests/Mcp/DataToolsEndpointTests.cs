@@ -109,7 +109,7 @@ public class DataToolsEndpointTests(McpServerFixture mcp)
         // By name, compared by name (the demo built here has identifiers of its own): the demo enters an actual for
         // every budget on each of its three past months.
         var expected = Demo.Budgets
-            .OrderBy(b => b.Name, StringComparer.Ordinal)
+            .OrderBy(b => b.Name, StringComparer.Create(CultureInfo.GetCultureInfo("fr-FR"), ignoreCase: true))
             .Select(b => (b.Name, b.PlannedAmount, Demo.BudgetActuals.Count(a => a.BudgetId == b.Id)));
         Assert.Equal(expected, budgets.Select(b => ((string)b!["name"]!, (decimal)b["plannedAmount"]!, (int)b["actualsEntered"]!)));
     }

@@ -19,7 +19,7 @@ public sealed record PlanOutput(
     public static PlanOutput From(FinanceMonth month, IReadOnlyDictionary<Guid, int> actualsByBudget) => new(
         month.Month.ToString(),
         [.. month.Budgets
-            .OrderBy(budget => budget.Name, StringComparer.Ordinal)
+            .OrderBy(budget => budget.Name, NameOrder)
             .ThenBy(budget => budget.Id)
             .Select(budget => new PlanBudgetOutput(
                 budget.Id, budget.Name, Cents(budget.PlannedAmount), actualsByBudget.GetValueOrDefault(budget.Id)))]);
@@ -27,8 +27,8 @@ public sealed record PlanOutput(
     /// <summary>Self-sufficient text summary, for the model and for hosts without UI.</summary>
     public string Describe() => Budgets.Count == 0
         ? $"Plan pour {MonthName(Month)} : aucun budget."
-        // Names between quotes: a name typed by the user, read by the model, stays a name.
-        : $"Plan pour {MonthName(Month)}. Budgets : {string.Join(" ; ", Budgets.Select(b => $"« {b.Name} » {Euros(b.PlannedAmount)} par mois"))}.";
+        // Names quoted: a name typed by the user, read by the model, stays a name.
+        : $"Plan pour {MonthName(Month)}. Budgets : {string.Join(" ; ", Budgets.Select(b => $"{Quoted(b.Name)} {Euros(b.PlannedAmount)} par mois"))}.";
 }
 
 /// <summary>A budget of the plan.</summary>

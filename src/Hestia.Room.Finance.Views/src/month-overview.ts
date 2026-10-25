@@ -36,6 +36,7 @@ function budgetsTable(data: MonthSummaryOutput, call: ViewContext["call"]): HTML
     const save = (actualAmount: number | null) => () =>
       call(SET_BUDGET_ACTUAL, { month: data.month, budgetId: budget.id, actualAmount });
     return {
+      key: budget.id,
       cells: () => [
         element("td", { text: budget.name }),
         amount(budget.planned, "td"),
@@ -63,6 +64,7 @@ function linesTable(data: MonthSummaryOutput, call: ViewContext["call"]): HTMLEl
     const save = (args: Readonly<Record<string, unknown>>) => () =>
       call(SET_LINE_ACTUAL, { month: data.month, lineId: line.id, ...args });
     return {
+      key: line.id,
       cells: () => [
         element("td", { text: formatDay(line.date) }),
         element("td", {}, line.name, ...(line.kind === "Income" ? [element("span", { className: "detail", text: "entrée" })] : [])),

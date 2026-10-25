@@ -25,10 +25,10 @@ public class PlanOutputTests
         Assert.Equal(
             [
                 new PlanBudgetOutput(Groceries.Id, "Courses", 320m, 3),
-                new PlanBudgetOutput(Outings.Id, "Sorties", 120.5m, 0),
-                // Ordinal: "Épargne" after "Sorties".
+                // In French: "Épargne" between "Courses" and "Sorties" (an ordinal order would put it last).
                 new PlanBudgetOutput(lowSavings.Id, "Épargne", 50m, 0),
                 new PlanBudgetOutput(savings.Id, "Épargne", 60m, 0),
+                new PlanBudgetOutput(Outings.Id, "Sorties", 120.5m, 0),
             ],
             output.Budgets);
     }

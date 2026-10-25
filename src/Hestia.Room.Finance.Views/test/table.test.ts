@@ -16,6 +16,7 @@ const items = ["Courses", "Sorties"];
 function render(options: { run?: () => Promise<boolean>; newRow?: NewRow | null; list?: string[] } = {}) {
   const run = options.run ?? vi.fn<() => Promise<boolean>>(pending);
   const rowOf = (name: string): EditableRow => ({
+    key: name.toLowerCase(),
     cells: () => [element("td", { text: name })],
     form: closing => recordForm({ ...closing, title: name, fields: [{ kind: "text", label: "Nom", value: name }], submit: pending }),
     ...(name === "Sorties" ? { remove: { confirmation: `Supprimer « ${name} » ?`, run } } : {}),
@@ -89,7 +90,8 @@ describe("editableTable", () => {
 
   it.each([
     ["Annuler", () => { buttonIn(row(1), "Annuler").click(); }],
-    ["Escape", () => { row(1).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); }],
+    // Pressed where the focus is: on Annuler, inside the confirmation.
+    ["Escape", () => { document.activeElement?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); }],
   ])("gives the row back on %s, the focus on Supprimer, without deleting", (_, back) => {
     const run = render();
     buttonIn(row(1), "Supprimer").click();
@@ -106,7 +108,7 @@ describe("editableTable", () => {
     buttonIn(row(1), "Supprimer").click();
 
     buttonIn(row(1), "Confirmer la suppression").click();
-    row(1).dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    buttonIn(row(1), "Annuler").dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 
     expect(run).toHaveBeenCalledOnce();
     expect([...row(1).querySelectorAll("button")].map(b => b.disabled)).toEqual([true, true]);
