@@ -28,6 +28,35 @@ internal static class Guard
     }
 
     /// <summary>
+    /// A name the user typed, trimmed: not empty, at most <see cref="NameLimit.MaxLength"/> characters, and none of the
+    /// characters that would break a line or hide text when the name is read back, by a person or by the model (control
+    /// characters, line and paragraph separators, bidirectional overrides).
+    /// </summary>
+    public static string ValidName(string name, [CallerArgumentExpression(nameof(name))] string? paramName = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name, paramName);
+        var trimmed = name.Trim();
+        if (trimmed.Length > NameLimit.MaxLength)
+        {
+            throw new ArgumentException(
+                string.Create(CultureInfo.InvariantCulture, $"A name has at most {NameLimit.MaxLength} characters."), paramName);
+        }
+
+        if (trimmed.Any(IsForbiddenInAName))
+        {
+            throw new ArgumentException("A name has no control character, line break nor direction override.", paramName);
+        }
+
+        return trimmed;
+    }
+
+    private static bool IsForbiddenInAName(char character) =>
+        char.IsControl(character)
+        || char.GetUnicodeCategory(character) is UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator
+        // Bidirectional embeddings, overrides and isolates: they reorder what is shown, a name could hide its real text.
+        || character is (>= (char)0x202A and <= (char)0x202E) or (>= (char)0x2066 and <= (char)0x2069);
+
+    /// <summary>
     /// Rejects an amount beyond <see cref="AmountLimit.Max"/>, positive or negative: what an input sent by hand (a
     /// typo, a call outside the views) could hold, never a real figure of a month.
     /// </summary>

@@ -35,7 +35,7 @@ public class FinanceMonthInputTests
     [Fact]
     public void ActualFor_AnUnknownBudget_Throws()
     {
-        var error = Assert.Throws<ArgumentException>(() => April2026.ActualFor(Guid.NewGuid(), 235m));
+        var error = Assert.Throws<UnknownBudgetException>(() => April2026.ActualFor(Guid.NewGuid(), 235m));
 
         Assert.Equal("budgetId", error.ParamName);
     }
@@ -82,9 +82,9 @@ public class FinanceMonthInputTests
             _ => Guid.NewGuid(),
         };
 
-        Assert.Equal("lineId", Assert.Throws<ArgumentException>(() => April2026.CorrectionFor(lineId, 52m)).ParamName);
-        Assert.Equal("lineId", Assert.Throws<ArgumentException>(() => April2026.SkippedFor(lineId)).ParamName);
-        Assert.Equal("lineId", Assert.Throws<ArgumentException>(() => April2026.EnsureLineDue(lineId)).ParamName);
+        Assert.Equal("lineId", Assert.Throws<LineNotDueException>(() => April2026.CorrectionFor(lineId, 52m)).ParamName);
+        Assert.Equal("lineId", Assert.Throws<LineNotDueException>(() => April2026.SkippedFor(lineId)).ParamName);
+        Assert.Equal("lineId", Assert.Throws<LineNotDueException>(() => April2026.EnsureLineDue(lineId)).ParamName);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class FinanceMonthInputTests
     [Fact]
     public void EnsureBudget_WithAnUnknownBudget_Throws()
     {
-        Assert.Equal("budgetId", Assert.Throws<ArgumentException>(() => April2026.EnsureBudget(Guid.NewGuid())).ParamName);
+        Assert.Equal("budgetId", Assert.Throws<UnknownBudgetException>(() => April2026.EnsureBudget(Guid.NewGuid())).ParamName);
     }
 
     public static TheoryData<decimal> AmountsTooLarge => [1_000_000_000m, decimal.MaxValue];

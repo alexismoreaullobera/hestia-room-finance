@@ -75,7 +75,7 @@ public sealed class FinanceMonth
     {
         if (Budgets.All(budget => budget.Id != budgetId))
         {
-            throw new ArgumentException("No budget with this identifier in the month.", nameof(budgetId));
+            throw new UnknownBudgetException(nameof(budgetId));
         }
     }
 
@@ -87,7 +87,7 @@ public sealed class FinanceMonth
     {
         if (Occurrences.All(occurrence => occurrence.Line.Id != lineId))
         {
-            throw new ArgumentException("No recurring line with this identifier due in the month.", nameof(lineId));
+            throw new LineNotDueException(nameof(lineId));
         }
     }
 
