@@ -15,7 +15,7 @@ public class ActualsInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifeti
     public ValueTask InitializeAsync() => ValueTask.CompletedTask;
 
     /// <summary>After each test, its months cleared: the other classes of the collection never see these writes.</summary>
-    public async ValueTask DisposeAsync() => await WrittenRows.DeleteTestMonthsAsync(mcp);
+    public async ValueTask DisposeAsync() => await WrittenRows.DeleteTestWritesAsync(mcp);
 
     public static TheoryData<string> Tools => ["set_budget_actual", "set_line_actual"];
 
