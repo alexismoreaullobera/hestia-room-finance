@@ -87,7 +87,7 @@ export function editableRow(table: string, index: number, columns: number, { cel
 
   function showConfirmation({ confirmation, run }: RowRemoval): void {
     const confirm = button("Confirmer la suppression", "confirm");
-    const back = button("Annuler");
+    const back = button("Annuler", "cancel");
     let busy = false;
     const setBusy = (value: boolean) => {
       busy = value;

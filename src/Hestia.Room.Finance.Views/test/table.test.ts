@@ -81,6 +81,8 @@ describe("editableTable", () => {
     expect(row(1).querySelector(".confirmation")?.getAttribute("role")).toBe("alert");
     expect(row(1).querySelector("td")?.colSpan).toBe(2);
     expect(names(row(1))).toEqual(["Confirmer la suppression", "Annuler"]);
+    // Styled like every button of the kit, never left to the default of the browser.
+    expect([...row(1).querySelectorAll("button")].map(b => b.className)).toEqual(["confirm", "cancel"]);
     expect(document.activeElement).toBe(buttonIn(row(1), "Annuler"));
     expect(run).not.toHaveBeenCalled();
   });

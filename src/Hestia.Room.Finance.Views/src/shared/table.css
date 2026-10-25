@@ -8,6 +8,7 @@ tr.editing .amount-form { max-width: 360px; }
 .confirmation { margin: 0 0 6px; }
 button.remove,
 button.confirm,
+button.cancel,
 button.new {
   font: inherit;
   font-size: 12px;
@@ -20,10 +21,13 @@ button.new {
 }
 button.confirm { border-color: var(--alert-line); color: var(--negative); }
 button.remove:hover,
+button.cancel:hover:not(:disabled),
 button.new:hover { border-color: var(--accent); }
 button.remove:focus-visible,
 button.confirm:focus-visible,
+button.cancel:focus-visible,
 button.new:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-button.confirm:disabled { opacity: .5; cursor: default; }
+button.confirm:disabled,
+button.cancel:disabled { opacity: .5; cursor: default; }
 .confirming .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 tfoot tr.new-row td { border-top: 1px solid var(--line); }
