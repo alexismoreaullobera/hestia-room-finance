@@ -19,6 +19,9 @@ public sealed class McpServerFixture : IAsyncLifetime
     /// <summary>The budgets of the demo seeded at startup: the only ones the cleanup of the input tests keeps.</summary>
     public IReadOnlyList<Guid> DemoBudgetIds { get; private set; } = [];
 
+    /// <summary>The recurring lines of the demo, as for the budgets.</summary>
+    public IReadOnlyList<Guid> DemoLineIds { get; private set; } = [];
+
     public async ValueTask InitializeAsync()
     {
         await _sqlServer.InitializeAsync();
@@ -30,6 +33,7 @@ public sealed class McpServerFixture : IAsyncLifetime
         await using var scope = Server.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
         DemoBudgetIds = await context.Budgets.Select(b => b.Id).ToListAsync();
+        DemoLineIds = await context.RecurringLines.Select(l => l.Id).ToListAsync();
     }
 
     public async ValueTask DisposeAsync()

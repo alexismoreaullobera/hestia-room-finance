@@ -29,6 +29,7 @@ builder.Services.AddMcpServer()
     .WithTools<FinanceDataTools>()
     .WithTools<FinanceViewTools>()
     .WithTools<FinanceInputTools>()
+    .WithTools<FinancePlanInputTools>()
     .WithResources(FinanceViewResources.Create())
     .WithMcpApps();
 

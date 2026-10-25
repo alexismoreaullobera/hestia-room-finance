@@ -14,7 +14,8 @@ namespace Hestia.Room.Finance.Mcp.Tools;
 /// an MCP Apps host hides them from the model and lets the views call them, but a host without MCP Apps support ignores
 /// that metadata and offers them to its model like any other tool. Not access control either: the server does not know
 /// who calls (see issue #2). Every value goes through the domain before being saved, and each tool returns the view
-/// data recalculated, so the view redraws from the server's figures without a second call.
+/// data recalculated, so the view redraws from the server's figures without a second call. The tools of the plan view
+/// are in <see cref="FinancePlanInputTools"/>.
 /// </summary>
 [McpServerToolType]
 public sealed class FinanceInputTools
@@ -121,86 +122,10 @@ public sealed class FinanceInputTools
             }
         }, cancellationToken);
 
-    [McpServerTool(Name = "create_budget", Title = "Saisie : nouveau budget", ReadOnly = false,
-        Destructive = false, Idempotent = false, OpenWorld = false, UseStructuredContent = true,
-        OutputSchemaType = typeof(Outputs.PlanOutput))]
-    [Description("Reserved for the plan view, where the user types it: not to be called from a conversation. Adds a budget "
-        + "to the plan (a variable expense planned every month), under a name no other budget uses. Then returns the plan, "
-        + "as get_plan does for the month given.")]
-    [McpAppUi(Visibility = [McpUiToolVisibility.App])]
-    public static Task<CallToolResult> CreateBudget(
-        FinancePlanWriter writer,
-        FinancePlanReader reader,
-        [Description("Month the view shows, as YYYY-MM: the plan returned is the one of that month.")] string month,
-        [Description(BudgetNameDescription)] string name,
-        [Description("Planned amount for every month, in euros with at most two decimals, more than 0.")] decimal plannedAmount,
-        CancellationToken cancellationToken = default) =>
-        DecideSaveAndReadAsync(reader, month, FinanceDataTools.PlanAsync, BudgetRule, (financeMonth, _) =>
-        {
-            var budget = new PlanBudgets(financeMonth.Budgets).Create(Guid.CreateVersion7(), name, plannedAmount);
-            return () => writer.AddBudgetAsync(budget, cancellationToken);
-        }, cancellationToken);
-
-    [McpServerTool(Name = "update_budget", Title = "Saisie : modification d'un budget", ReadOnly = false,
-        Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true,
-        OutputSchemaType = typeof(Outputs.PlanOutput))]
-    [Description("Reserved for the plan view, where the user types it: not to be called from a conversation. Renames a "
-        + "budget or gives it another planned amount, for every month (past ones included). Then returns the plan, as "
-        + "get_plan does for the month given.")]
-    [McpAppUi(Visibility = [McpUiToolVisibility.App])]
-    public static Task<CallToolResult> UpdateBudget(
-        FinancePlanWriter writer,
-        FinancePlanReader reader,
-        [Description("Month the view shows, as YYYY-MM: the plan returned is the one of that month.")] string month,
-        [Description("Identifier of a budget of the plan.")] Guid budgetId,
-        [Description(BudgetNameDescription)] string name,
-        [Description("Planned amount for every month, in euros with at most two decimals, more than 0.")] decimal plannedAmount,
-        CancellationToken cancellationToken = default) =>
-        DecideSaveAndReadAsync(reader, month, FinanceDataTools.PlanAsync, BudgetRule, (financeMonth, _) =>
-        {
-            var budget = new PlanBudgets(financeMonth.Budgets).Update(budgetId, name, plannedAmount);
-            return () => writer.UpdateBudgetAsync(budget, cancellationToken);
-        }, cancellationToken);
-
-    [McpServerTool(Name = "delete_budget", Title = "Saisie : suppression d'un budget", ReadOnly = false,
-        Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true,
-        OutputSchemaType = typeof(Outputs.PlanOutput))]
-    [Description("Reserved for the plan view, where the user confirms it: not to be called from a conversation. Deletes a "
-        + "budget entered by mistake, and with it every actual entered for it (a budget has no dates). Then returns the "
-        + "plan, as get_plan does for the month given.")]
-    [McpAppUi(Visibility = [McpUiToolVisibility.App])]
-    public static Task<CallToolResult> DeleteBudget(
-        FinancePlanWriter writer,
-        FinancePlanReader reader,
-        [Description("Month the view shows, as YYYY-MM: the plan returned is the one of that month.")] string month,
-        [Description("Identifier of a budget of the plan.")] Guid budgetId,
-        [Description("The number of actuals of this budget the user was told would go with it (its actualsEntered in "
-            + "get_plan): the deletion is refused when it changed since.")] int actualsEntered,
-        CancellationToken cancellationToken = default) =>
-        DecideSaveAndReadAsync(reader, month, FinanceDataTools.PlanAsync, BudgetRule, (financeMonth, _) =>
-        {
-            new PlanBudgets(financeMonth.Budgets).EnsureExists(budgetId);
-            return async () =>
-            {
-                // Never more deleted than the confirmation said: an actual entered meanwhile (another view, another host)
-                // would go unseen with the budget.
-                var counts = await reader.CountActualsByBudgetAsync(cancellationToken);
-                if (counts.GetValueOrDefault(budgetId) != actualsEntered)
-                    throw new McpException("The actuals of this budget changed since the confirmation: nothing was deleted. "
-                        + "Show the plan again before deleting.");
-                await writer.DeleteBudgetAsync(budgetId, cancellationToken);
-            };
-        }, cancellationToken);
-
-    private const string BudgetNameDescription =
-        "Name of the budget, such as Courses: at most 100 characters, no line break nor invisible character; not the name "
-        + "of another budget.";
-
     /// <summary>
-    /// The skeleton of the input tools that need the month (all but set_starting_balance): the month read, the domain
-    /// deciding what to save, then the save, then the view data read back through the path of the data tool. Nothing
-    /// is written when the domain refuses: its exception becomes a tool error, the decision never reaching the writer. A
-    /// name the database refuses (taken meanwhile) becomes the same tool error as one the domain refuses.
+    /// The skeleton of the input tools of a month (the actuals): the month read, the domain deciding what to save, then
+    /// the save, then the view data read back through the path of the data tool. Nothing is written when the domain
+    /// refuses: its exception becomes a tool error, the decision never reaching the writer.
     /// </summary>
     /// <param name="readBack">The view data returned, as its data tool gives it.</param>
     /// <param name="valueRule">What a value of this tool must be, for the error of a value refused by the domain.</param>
@@ -226,25 +151,12 @@ public sealed class FinanceInputTools
             throw Refused(error, yearMonth, valueRule);
         }
 
-        try
-        {
-            await save();
-        }
-        catch (NameTakenException error)
-        {
-            // Only this one: any other failure of the save is a server error, never a message about the input.
-            throw Refused(error, yearMonth, valueRule);
-        }
-
+        await save();
         return await readBack(reader, yearMonth, cancellationToken);
     }
 
     private static string ActualAmountRule(string sign) => string.Create(CultureInfo.InvariantCulture,
         $"Invalid actualAmount: expected euros with at most two decimals, {sign}, at most {AmountLimit.Max}.");
-
-    private static readonly string BudgetRule = string.Create(CultureInfo.InvariantCulture,
-        $"Invalid budget: expected a name of at most {NameLimit.MaxLength} characters, with a visible one, without line break, "
-        + $"control nor invisible character, and a planned amount in euros with at most two decimals, more than 0, at most {AmountLimit.Max}.");
 
     /// <summary>
     /// A rule of the domain broken by an input, as a tool error a client can read and fix: told apart by the type of the
@@ -253,10 +165,8 @@ public sealed class FinanceInputTools
     /// </summary>
     private static McpException Refused(ArgumentException error, YearMonth month, string valueRule) => new(error switch
     {
-        // A budget has no dates: it is in the plan or not, whatever the month.
-        UnknownBudgetException => "No budget with this identifier in the plan.",
+        UnknownBudgetException => FinancePlanInputTools.UnknownBudget,
         LineNotDueException => $"No recurring line with this identifier is due in {month}.",
-        NameTakenException => "Another budget already has this name.",
         _ => valueRule,
     }, error);
 }
