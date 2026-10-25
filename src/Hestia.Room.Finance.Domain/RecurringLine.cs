@@ -26,10 +26,11 @@ public sealed class RecurringLine
         ThrowIfUndefined(frequency);
         ThrowIfUndefined(category);
         Guard.ThrowIfEmpty(id);
-        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        var validName = Guard.ValidName(name);
         // The sign comes from the kind: an amount is always positive.
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(amount);
         Guard.ThrowIfNotCents(amount);
+        Guard.ThrowIfTooLarge(amount);
         ArgumentOutOfRangeException.ThrowIfLessThan(dayOfMonth, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(dayOfMonth, 31);
 
@@ -55,7 +56,7 @@ public sealed class RecurringLine
 
         Id = id;
         Kind = kind;
-        Name = name;
+        Name = validName;
         Amount = amount;
         Frequency = frequency;
         DayOfMonth = dayOfMonth;
@@ -92,6 +93,10 @@ public sealed class RecurringLine
     public SubscriptionInfo? Subscription { get; }
 
     public bool IsSubscription => Subscription is not null;
+
+    /// <summary>The same line, ending on this date (checked again: never before its start date).</summary>
+    public RecurringLine EndingOn(DateOnly endDate) =>
+        new(Id, Kind, Name, Amount, Frequency, DayOfMonth, StartDate, AnchorMonth, endDate, Category, Subscription);
 
     /// <summary>
     /// What the line weighs on one month: a 360 € yearly insurance weighs 30 € per month.

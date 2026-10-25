@@ -7,6 +7,10 @@ namespace Hestia.Room.Finance.Domain;
 public sealed class UnknownBudgetException(string paramName)
     : ArgumentException("No budget with this identifier.", paramName);
 
+/// <summary>No recurring line with this identifier in the plan.</summary>
+public sealed class UnknownLineException(string paramName)
+    : ArgumentException("No recurring line with this identifier.", paramName);
+
 /// <summary>No recurring line with this identifier due in the month.</summary>
 public sealed class LineNotDueException(string paramName)
     : ArgumentException("No recurring line with this identifier due in the month.", paramName);

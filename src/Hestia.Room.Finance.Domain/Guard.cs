@@ -34,6 +34,12 @@ internal static class Guard
     /// characters, with at least one visible character, and none of the characters that would break a line or hide text
     /// when the name is read back, by a person or by the model.
     /// </summary>
+    /// <summary>
+    /// Two names of the plan read as the same one: ignoring case ("Courses" and "courses"), ordinal, never the culture of
+    /// the server. Accents count: "Épargne" and "Epargne" are two names.
+    /// </summary>
+    public static bool IsSameName(string name, string other) => string.Equals(name, other, StringComparison.OrdinalIgnoreCase);
+
     public static string ValidName(string name, [CallerArgumentExpression(nameof(name))] string? paramName = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name, paramName);

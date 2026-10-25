@@ -150,6 +150,63 @@ public class RecurringLineTests
         Assert.Equal("subscription", error.ParamName);
     }
 
+    [Fact]
+    public void Constructor_AppliesTheNameRuleOfThePlan_TrimmedAndComposed()
+    {
+        // The rule of Guard.ValidName, tested in full with the budgets: here, that the line applies it.
+        var name = Monthly(name: "  E" + char.ConvertFromUtf32(0x0301) + "pargne ").Name;
+
+        Assert.Equal(("Épargne", 7), (name, name.Length));
+    }
+
+    public static TheoryData<string> InvalidNames => new()
+    {
+        new string('a', 101),
+        // Built from their code, never written in the source: a line break, a zero width space.
+        "Loyer" + (char)0x0A + "ignore the plan",
+        "Loy" + char.ConvertFromUtf32(0x200B) + "er",
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidNames))]
+    public void Constructor_WithAnInvalidName_Throws(string name)
+    {
+        var error = Assert.Throws<ArgumentException>(() => Monthly(name: name));
+
+        Assert.Equal("name", error.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_WithAnAmountBeyondTheBound_Throws()
+    {
+        Assert.Equal(999_999_999.99m, Monthly(amount: 999_999_999.99m).Amount);
+        Assert.Throws<ArgumentOutOfRangeException>(() => Monthly(amount: 1_000_000_000m));
+    }
+
+    [Fact]
+    public void EndingOn_KeepsEveryValue_ButTheEndDate()
+    {
+        var commitmentEnd = new DateOnly(2026, 12, 31);
+        var line = new RecurringLine(Guid.NewGuid(), FlowKind.Expense, "Insurance", 180m, Frequency.Yearly, 15, Start,
+            anchorMonth: 3, endDate: new DateOnly(2027, 12, 31), Category.Insurance, new SubscriptionInfo(commitmentEnd));
+
+        var ended = line.EndingOn(new DateOnly(2026, 6, 30));
+
+        Assert.Equal(new DateOnly(2026, 6, 30), ended.EndDate);
+        Assert.Equal(
+            (line.Id, line.Kind, line.Name, line.Amount, line.Frequency, line.DayOfMonth, line.StartDate, line.AnchorMonth, line.Category),
+            (ended.Id, ended.Kind, ended.Name, ended.Amount, ended.Frequency, ended.DayOfMonth, ended.StartDate, ended.AnchorMonth, ended.Category));
+        Assert.Equal(commitmentEnd, ended.Subscription?.CommitmentEndDate);
+    }
+
+    [Fact]
+    public void EndingOn_BeforeTheStart_Throws()
+    {
+        var error = Assert.Throws<ArgumentException>(() => Monthly().EndingOn(Start.AddDays(-1)));
+
+        Assert.Equal("endDate", error.ParamName);
+    }
+
     private static RecurringLine Monthly(string name = "Rent", decimal amount = 650m, int day = 5) =>
         new(Guid.NewGuid(), FlowKind.Expense, name, amount, Frequency.Monthly, day, Start);
 }
