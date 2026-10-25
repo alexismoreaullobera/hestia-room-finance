@@ -1,0 +1,23 @@
+{
+  "month": "2027-03",
+  "budgets": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "name": "Carburant",
+      "plannedAmount": 90.00,
+      "actualsEntered": 3
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "name": "Courses",
+      "plannedAmount": 320.00,
+      "actualsEntered": 3
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000003",
+      "name": "Sorties",
+      "plannedAmount": 120.00,
+      "actualsEntered": 3
+    }
+  ]
+}

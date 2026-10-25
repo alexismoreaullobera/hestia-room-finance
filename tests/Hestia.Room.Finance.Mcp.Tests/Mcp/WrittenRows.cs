@@ -11,6 +11,24 @@ namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 /// </summary>
 internal static class WrittenRows
 {
+    /// <summary>The first month the input tests write to, years after the demo plan: no other test reads it.</summary>
+    public static readonly DateOnly FirstTestMonth = new(2031, 1, 1);
+
+    /// <summary>
+    /// Deletes what the input tests wrote to their months (settings, actuals, overrides), so that what other classes read
+    /// across months (the number of actuals of a budget in get_plan, its fixture) never depends on the order of the tests.
+    /// </summary>
+    public static async Task DeleteTestMonthsAsync(McpServerFixture mcp)
+    {
+        await using var scope = mcp.Server.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
+        var token = TestContext.Current.CancellationToken;
+
+        await context.MonthPlans.Where(p => p.Month >= FirstTestMonth).ExecuteDeleteAsync(token);
+        await context.BudgetActuals.Where(a => a.Month >= FirstTestMonth).ExecuteDeleteAsync(token);
+        await context.RecurringOverrides.Where(o => o.Month >= FirstTestMonth).ExecuteDeleteAsync(token);
+    }
+
     public static async Task<string> SnapshotAsync(McpServerFixture mcp)
     {
         await using var scope = mcp.Server.Services.CreateAsyncScope();

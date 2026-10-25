@@ -16,6 +16,7 @@ public static class FinanceViewResources
     public const string MonthOverviewUri = "ui://finance/month-overview.html";
     public const string CashFlowForecastUri = "ui://finance/cash-flow-forecast.html";
     public const string SubscriptionsUri = "ui://finance/subscriptions.html";
+    public const string PlanUri = "ui://finance/plan.html";
 
     private static readonly ViewDefinition[] Views =
     [
@@ -25,6 +26,8 @@ public static class FinanceViewResources
             "View of show_cash_flow_forecast: alert, low point, cash buffer, daily balance chart and contributing debits."),
         new(SubscriptionsUri, "subscriptions_view", "Abonnements", "subscriptions.html",
             "View of show_subscriptions: monthly and yearly totals, debits of the month and commitment ends."),
+        new(PlanUri, "plan_view", "Plan", "plan.html",
+            "View of show_plan: the budgets of the plan, created, edited and deleted there."),
     ];
 
     // No external domain: the views are self-contained, the App SDK included. With an empty CSP, the host applies the

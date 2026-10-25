@@ -41,7 +41,7 @@
     <ViewsSource Include="$(ViewsProjectDir)src\**\*;$(ViewsProjectDir)views\*.html" />
     <ViewsSource Include="$(ViewsProjectDir)package.json;$(ViewsProjectDir)package-lock.json;$(ViewsProjectDir)build.js;$(ViewsProjectDir)vite.config.ts" />
     <ViewsSource Include="$(ViewsProjectDir)tsconfig.json;$(ViewsProjectDir)tsconfig.build.json" />
-    <ViewsOutput Include="$(ViewsDistDir)month-overview.html;$(ViewsDistDir)cash-flow-forecast.html;$(ViewsDistDir)subscriptions.html" />
+    <ViewsOutput Include="$(ViewsDistDir)month-overview.html;$(ViewsDistDir)cash-flow-forecast.html;$(ViewsDistDir)subscriptions.html;$(ViewsDistDir)plan.html" />
     <!-- Seen by the fast up-to-date check of Visual Studio and by dotnet watch, which ignore custom item types. -->
     <UpToDateCheckInput Include="@(ViewsSource)" />
     <Watch Include="@(ViewsSource)" />

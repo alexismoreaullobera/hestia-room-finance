@@ -8,9 +8,14 @@ namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 /// The budgets and lines are the ones of the demo, still running then.
 /// </summary>
 [Collection(McpServerCollection.Name)]
-public class ActualsInputToolsEndpointTests(McpServerFixture mcp)
+public class ActualsInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetime
 {
     private readonly McpTestClient _mcp = new(mcp.Server.CreateClient());
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    /// <summary>After each test, its months cleared: the other classes of the collection never see these writes.</summary>
+    public async ValueTask DisposeAsync() => await WrittenRows.DeleteTestMonthsAsync(mcp);
 
     public static TheoryData<string> Tools => ["set_budget_actual", "set_line_actual"];
 

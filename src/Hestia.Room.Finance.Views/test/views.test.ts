@@ -3,13 +3,15 @@ import type { ViewContext } from "../src/shared/view";
 import { cashFlowForecast, chart, MIN_WIDTH } from "../src/cash-flow-forecast";
 import { monthOverview, SET_BUDGET_ACTUAL, SET_LINE_ACTUAL } from "../src/month-overview";
 import type {
-  BudgetActualOutput, CashFlowForecastOutput, LineActualOutput, MonthSummaryOutput, SubscriptionOutput, SubscriptionsOutput,
+  BudgetActualOutput, CashFlowForecastOutput, LineActualOutput, MonthSummaryOutput, PlanOutput, SubscriptionOutput, SubscriptionsOutput,
 } from "../src/shared/outputs";
 import { formatEuros } from "../src/shared/format";
 import { subscriptions } from "../src/subscriptions";
 import forecastFixture from "./fixtures/cash-flow-forecast.json";
 import monthFixture from "./fixtures/month-overview.json";
 import subscriptionsFixture from "./fixtures/subscriptions.json";
+import planFixture from "./fixtures/plan.json";
+import { plan } from "../src/plan";
 import { startView } from "../src/shared/view";
 import { asHostApp, at, fakeApp, ManualResizeObserver, pageSkeleton, plain, toolResult } from "./helpers";
 
@@ -19,6 +21,7 @@ import { asHostApp, at, fakeApp, ManualResizeObserver, pageSkeleton, plain, tool
 const demoMonth = monthFixture as MonthSummaryOutput;
 const demoForecast: CashFlowForecastOutput = forecastFixture;
 const demoSubscriptions = subscriptionsFixture as SubscriptionsOutput;
+const demoPlan: PlanOutput = planFixture;
 
 let content: HTMLElement;
 beforeEach(() => {
@@ -37,6 +40,7 @@ describe("view definitions", () => {
     [monthOverview.tool, "show_month_overview"],
     [cashFlowForecast.tool, "show_cash_flow_forecast"],
     [subscriptions.tool, "show_subscriptions"],
+    [plan.tool, "show_plan"],
   ])("a view changes month through its own tool: %s", (tool, expected) => {
     // Written as literals: the view tool names are a contract with the server (tested on the server side too).
     expect(tool).toBe(expected);
@@ -523,6 +527,20 @@ describe("chart", () => {
     const tooltips = [...chart(demoForecast.days, demoForecast.lowPoint, 640).querySelectorAll("rect.day title")];
 
     expect(plain(tooltips[0]?.textContent)).toBe(`01/03 : ${plain(formatEuros(demoForecast.days[0]!.balance))}`);
+  });
+});
+
+describe("plan", () => {
+  it("shows each budget of the plan with its planned amount, by name", () => {
+    plan.render(demoPlan, content, at(640));
+
+    expect(rows(".budgets")).toEqual(demoPlan.budgets.map(b => [[b.name], [euros(b.plannedAmount)]]));
+  });
+
+  it("says when the plan has no budget", () => {
+    plan.render({ ...demoPlan, budgets: [] }, content, at(640));
+
+    expect(content.textContent).toBe("Aucun budget dans le plan.");
   });
 });
 
