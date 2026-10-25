@@ -372,6 +372,24 @@ describe("startView", () => {
     expect(render).toHaveBeenCalledTimes(2);
   });
 
+  it("never renders on a resize while a deletion waits for its confirmation", async () => {
+    // Opening the confirmation makes the content taller: a scrollbar appears and the width changes, which closed it.
+    render.mockImplementation((_, node) => {
+      const row = document.createElement("tr");
+      row.className = "confirming";
+      node.append(row);
+    });
+    const app = fakeApp();
+    await startView(view, asHostApp(app));
+    setWidth(content, 640);
+    app.sendResult(result("2026-10"));
+
+    setWidth(content, 623);
+    ManualResizeObserver.last!.trigger();
+
+    expect(render).toHaveBeenCalledOnce();
+  });
+
   it("does not render on a resize before the first result", async () => {
     await startView(view, asHostApp(fakeApp()));
     setWidth(content, 480);
