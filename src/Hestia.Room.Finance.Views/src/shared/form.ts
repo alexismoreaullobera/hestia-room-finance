@@ -19,11 +19,12 @@ export interface TextField {
   check?: (text: string) => string | null;
 }
 
-/** An amount field: prefilled with formatAmount, read back by parseEuros. */
+/** An amount field: prefilled with formatAmount (empty for null, a new item), read back by parseEuros; its check as above. */
 export interface AmountField {
   kind: "amount";
   label: string;
-  value: number;
+  value: number | null;
+  check?: (amount: number) => string | null;
 }
 
 export type Field = TextField | AmountField;
@@ -69,7 +70,7 @@ export function recordForm({ title, fields, submit, cancel, actions = [], afterS
         ? { type: "text", inputmode: "decimal", autocomplete: "off", "aria-label": field.label }
         : { type: "text", autocomplete: "off", "aria-label": field.label },
     });
-    input.value = field.kind === "amount" ? formatAmount(field.value) : field.value;
+    input.value = field.kind === "text" ? field.value : field.value === null ? "" : formatAmount(field.value);
     return { field, input };
   });
   const inputs = entries.map(entry => entry.input);
@@ -116,6 +117,8 @@ export function recordForm({ title, fields, submit, cancel, actions = [], afterS
       if (field.kind === "amount") {
         const amount = parseEuros(input.value);
         if (amount === null) return { problem: "Montant attendu, par exemple 1 250,50.", input };
+        const refused = field.check?.(amount) ?? null;
+        if (refused !== null) return { problem: refused, input };
         values.push(amount);
       } else {
         const text = input.value.trim();
