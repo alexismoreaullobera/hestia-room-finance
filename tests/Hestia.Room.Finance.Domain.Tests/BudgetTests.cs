@@ -52,6 +52,10 @@ public class BudgetTests
         "Courses" + (char)0x202E + "sesruoc",
         (char)0x2066 + "Courses" + (char)0x2069,
         "Cour" + (char)0x00 + "ses",
+        // A lone surrogate: not a character at all.
+        "Cour" + (char)0xD800 + "ses",
+        // Nothing visible: a combining accent alone.
+        char.ConvertFromUtf32(0x0301),
     };
 
     [Theory]
@@ -61,6 +65,39 @@ public class BudgetTests
         var error = Assert.Throws<ArgumentException>(() => new Budget(Guid.NewGuid(), name, 200m));
 
         Assert.Equal("name", error.ParamName);
+    }
+
+    public static TheoryData<int> HiddenCharacters => new()
+    {
+        // Format characters: zero width space, left-to-right mark, soft hyphen, byte order mark, a tag character.
+        0x200B, 0x200E, 0x00AD, 0xFEFF, 0xE0041,
+        // Bidirectional embeddings, overrides and isolates, each one alone.
+        0x202A, 0x202D, 0x2067, 0x2068, 0x2069,
+        // Private use, and a code point not assigned.
+        0xE000, 0x0378,
+        // Fillers that render blank without being spaces: Hangul fillers, the blank Braille pattern.
+        0x115F, 0x1160, 0x3164, 0xFFA0, 0x2800,
+    };
+
+    [Theory]
+    [MemberData(nameof(HiddenCharacters))]
+    public void Constructor_WithAHiddenCharacterInside_Throws(int codePoint)
+    {
+        // Built from its code, never written in the source.
+        var name = "Cour" + char.ConvertFromUtf32(codePoint) + "ses";
+
+        var error = Assert.Throws<ArgumentException>(() => new Budget(Guid.NewGuid(), name, 200m));
+
+        Assert.Equal("name", error.ParamName);
+    }
+
+    [Fact]
+    public void Constructor_StoresTheComposedForm()
+    {
+        // "É" typed as "E" and a combining accent (as some keyboards and pastes do): stored as the single "É".
+        var name = new Budget(Guid.NewGuid(), "E" + char.ConvertFromUtf32(0x0301) + "pargne", 200m).Name;
+
+        Assert.Equal(("Épargne", 7), (name, name.Length));
     }
 
     [Fact]

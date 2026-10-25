@@ -1,4 +1,7 @@
+using Hestia.Room.Finance.Infrastructure;
 using Hestia.Room.Finance.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 
@@ -13,6 +16,9 @@ public sealed class McpServerFixture : IAsyncLifetime
 
     public DevelopmentMcpServerFactory Server { get; private set; } = null!;
 
+    /// <summary>The budgets of the demo seeded at startup: the only ones the cleanup of the input tests keeps.</summary>
+    public IReadOnlyList<Guid> DemoBudgetIds { get; private set; } = [];
+
     public async ValueTask InitializeAsync()
     {
         await _sqlServer.InitializeAsync();
@@ -20,6 +26,10 @@ public sealed class McpServerFixture : IAsyncLifetime
         // Started here, not lazily by the first test: a failing startup (migrations, seed) fails the fixture once,
         // with its own error, instead of every test in turn.
         Server.StartServer();
+
+        await using var scope = Server.Services.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
+        DemoBudgetIds = await context.Budgets.Select(b => b.Id).ToListAsync();
     }
 
     public async ValueTask DisposeAsync()

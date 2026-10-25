@@ -91,6 +91,48 @@ public class FinancePlanWriterBudgetsTests(SqlServerFixture sqlServer)
     }
 
     [Fact]
+    public async Task AddBudget_RefusedByTheIndex_LeavesTheContextReadyForAnotherSave()
+    {
+        var options = await SeedAsync();
+        await using var context = new FinanceDbContext(options);
+        var writer = new FinancePlanWriter(context);
+
+        await Assert.ThrowsAsync<NameTakenException>(() => writer.AddBudgetAsync(NewBudget("courses", 50m), Token));
+        // The same context: the budget refused is not tried again.
+        await writer.AddBudgetAsync(NewBudget("Carburant", 90m), Token);
+
+        Assert.Equal(["Carburant", "Courses", "Sorties"], (await LoadAsync(options, May)).Budgets.Select(b => b.Name).Order());
+    }
+
+    [Fact]
+    public async Task UpdateBudget_UnderTheNameOfAnother_IsRefusedByTheDatabase_AsANameTaken()
+    {
+        var options = await SeedAsync();
+        await using var context = new FinanceDbContext(options);
+        var writer = new FinancePlanWriter(context);
+
+        await Assert.ThrowsAsync<NameTakenException>(() => writer.UpdateBudgetAsync(new Budget(_groceries.Id, "SORTIES", 330m), Token));
+        // The same context: the values refused are gone from it, never saved again with the next write.
+        await writer.SetBudgetActualAsync(new BudgetActual(_groceries.Id, May, 280m), Token);
+
+        var month = await LoadAsync(options, May);
+        var budget = month.Budgets.Single(b => b.Id == _groceries.Id);
+        Assert.Equal(("Courses", 320m), (budget.Name, budget.PlannedAmount));
+        Assert.Equal([new BudgetActual(_groceries.Id, May, 280m)], month.BudgetActuals);
+    }
+
+    [Fact]
+    public async Task AddBudget_TellsAccentsApart_LikeTheDomain()
+    {
+        var options = await SeedAsync();
+
+        await WriteAsync(options, w => w.AddBudgetAsync(NewBudget("Épargne", 50m), Token));
+        await WriteAsync(options, w => w.AddBudgetAsync(NewBudget("Epargne", 50m), Token));
+
+        Assert.Equal(4, (await LoadAsync(options, May)).Budgets.Count);
+    }
+
+    [Fact]
     public async Task CountActualsByBudget_GivesTheMonthsEnteredPerBudget()
     {
         var options = await SeedAsync();

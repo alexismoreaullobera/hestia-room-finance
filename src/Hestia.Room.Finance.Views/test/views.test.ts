@@ -613,6 +613,22 @@ describe("plan", () => {
     expect(newRow().querySelector(".field-error")?.textContent).toBe(message);
   });
 
+  it.each([
+    ["", "Nom attendu."],
+    ["   ", "Nom attendu."],
+    ["sorties", "Un autre budget porte déjà ce nom."],
+    [" SORTIES ", "Un autre budget porte déjà ce nom."],
+  ])("refuses the name %j for a budget changed, before any call", (name, message) => {
+    const call = render();
+    buttonIn(rowOf(1), "Modifier").click();
+    fieldsIn(rowOf(1))[0]!.value = name;
+
+    submitIn(rowOf(1));
+
+    expect(call).not.toHaveBeenCalled();
+    expect(rowOf(1).querySelector(".field-error")?.textContent).toBe(message);
+  });
+
   it("accepts a name of 100 characters", () => {
     const call = render();
     buttonIn(newRow(), "Nouveau budget").click();
@@ -668,6 +684,30 @@ describe("plan saved through startView", () => {
     expect(app.callServerTool).toHaveBeenCalledWith({ name: "create_budget", arguments: { month: "2027-03", name: "Cadeaux", plannedAmount: 40.5 } });
     expect(addRow().querySelector("input")).toBeNull();
     expect(document.activeElement).toBe(addRow().querySelector(".new"));
+  });
+});
+
+describe("plan renamed through startView", () => {
+  afterEach(() => { vi.unstubAllGlobals(); });
+
+  it("puts the focus back on Modifier of the budget renamed, wherever the new name sorts it", async () => {
+    vi.stubGlobal("ResizeObserver", ManualResizeObserver);
+    const [fuel, groceries, outings] = demoPlan.budgets as [PlanBudgetOutput, PlanBudgetOutput, PlanBudgetOutput];
+    const page = pageSkeleton();
+    const app = fakeApp();
+    // "Alimentation": first once sorted by the server, no longer second.
+    const renamed = { ...demoPlan, budgets: [{ ...groceries, name: "Alimentation" }, fuel, outings] };
+    app.callServerTool.mockResolvedValue(toolResult({ structuredContent: { ...renamed } }));
+    await startView(plan, asHostApp(app));
+    app.sendResult(toolResult({ structuredContent: { ...demoPlan } }));
+    const row = (index: number) => page.querySelectorAll(".budgets tbody tr")[index]!;
+    [...row(1).querySelectorAll("button")].find(b => b.textContent === "Modifier")!.click();
+    row(1).querySelectorAll("input")[0]!.value = "Alimentation";
+
+    [...row(1).querySelectorAll("button")].find(b => b.textContent === "Enregistrer")!.click();
+
+    await vi.waitFor(() => { expect(row(0).querySelector("td")?.textContent).toBe("Alimentation"); });
+    expect(document.activeElement).toBe(row(0).querySelector(".edit"));
   });
 });
 

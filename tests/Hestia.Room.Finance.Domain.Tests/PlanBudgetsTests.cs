@@ -30,6 +30,17 @@ public class PlanBudgetsTests
     }
 
     [Fact]
+    public void Create_TellsAccentsApart_ButNotHowTheyAreWritten()
+    {
+        var plan = new PlanBudgets([new Budget(Guid.NewGuid(), "Épargne", 50m)]);
+
+        // Another name: without its accent.
+        Assert.Equal("Epargne", plan.Create(Guid.NewGuid(), "Epargne", 50m).Name);
+        // The same name: its "É" written as "E" and a combining accent.
+        Assert.Throws<NameTakenException>(() => plan.Create(Guid.NewGuid(), "E" + char.ConvertFromUtf32(0x0301) + "pargne", 50m));
+    }
+
+    [Fact]
     public void Update_KeepsItsOwnName_OrChangesItsCase()
     {
         // Its own name is no conflict: a change of amount, or of case only.

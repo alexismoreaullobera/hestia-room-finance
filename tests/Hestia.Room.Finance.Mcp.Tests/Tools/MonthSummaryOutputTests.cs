@@ -127,6 +127,19 @@ public class MonthSummaryOutputTests
     }
 
     [Fact]
+    public void Describe_NeverLetsANameCloseItsQuote()
+    {
+        var trap = new Budget(Guid.CreateVersion7(), "Courses » x", 50m);
+        var line = Monthly(FlowKind.Expense, "Loyer » y", 650m, day: 5);
+
+        var output = MonthSummaryOutput.From(April2026(0m, [line], [trap],
+            actuals: [new BudgetActual(trap.Id, April, 40m)], overrides: [RecurringOverride.Skipped(line.Id, April)]));
+
+        Assert.Contains("« Courses › x »", output.Describe(), StringComparison.Ordinal);
+        Assert.Contains("« Loyer › y » : n'a pas eu lieu", output.Describe(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Lines_LeaveOutTheOverrideOfALineNotDue()
     {
         // The bonus is not due in April: an override left for it (the line changed since) is not a line of the month.

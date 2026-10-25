@@ -111,6 +111,41 @@ public class BudgetInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetim
         Assert.DoesNotContain(summary["budgets"]!.AsArray(), b => (string?)b!["id"] == id);
     }
 
+    [Fact]
+    public async Task ANameTheDatabaseTakesForAnother_IsRefused_WithTheMessageOfTheDomain_AndWritesNothing()
+    {
+        // "Œ" and "OE" are two names for the domain (ordinal), the same one for the collation of SQL Server: the unique
+        // index refuses, as a name taken, for a new budget as for a rename.
+        await CreateAsync("Œuvres", 40m);
+        var other = await CreateAsync("Cadeaux", 40m);
+        var before = await WrittenRows.SnapshotAsync(mcp);
+
+        var created = await _mcp.CallToolAsync("create_budget", new JsonObject { ["month"] = Month, ["name"] = WrittenRows.TestBudgetPrefix + "Oeuvres", ["plannedAmount"] = 10m });
+        var renamed = await _mcp.CallToolAsync("update_budget", new JsonObject { ["month"] = Month, ["budgetId"] = other, ["name"] = WrittenRows.TestBudgetPrefix + "OEUVRES", ["plannedAmount"] = 40m });
+
+        Assert.All([created, renamed], result =>
+        {
+            Assert.True((bool?)result["isError"]);
+            Assert.Contains("Another budget already has this name.", (string)result["content"]!.AsArray().Single()!["text"]!);
+        });
+        Assert.Equal(before, await WrittenRows.SnapshotAsync(mcp));
+    }
+
+    [Fact]
+    public async Task DeleteBudget_WhenItsActualsChangedSinceTheConfirmation_IsRefused_AndDeletesNothing()
+    {
+        var id = await CreateAsync("Cadeaux", 40m);
+        // Entered after the plan the confirmation was built from (0 actuals).
+        await CallAsync("set_budget_actual", new JsonObject { ["budgetId"] = id, ["actualAmount"] = 12m }, month: "2031-11");
+        var before = await WrittenRows.SnapshotAsync(mcp);
+
+        var result = await _mcp.CallToolAsync("delete_budget", new JsonObject { ["month"] = Month, ["budgetId"] = id, ["actualsEntered"] = 0 });
+
+        Assert.True((bool?)result["isError"]);
+        Assert.Contains("changed since the confirmation", (string)result["content"]!.AsArray().Single()!["text"]!);
+        Assert.Equal(before, await WrittenRows.SnapshotAsync(mcp));
+    }
+
     public static TheoryData<string, string, string> InvalidCalls => new()
     {
         // Tool, arguments with the placeholders MINE (a budget created by the test) and DEMO (the name of a demo budget).

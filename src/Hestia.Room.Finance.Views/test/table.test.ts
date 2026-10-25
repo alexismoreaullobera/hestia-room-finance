@@ -103,6 +103,18 @@ describe("editableTable", () => {
     expect(run).not.toHaveBeenCalled();
   });
 
+  it("leaves nothing of a cancelled confirmation: Escape in the form then gives the focus back to Modifier", () => {
+    render();
+    buttonIn(row(1), "Supprimer").click();
+    buttonIn(row(1), "Annuler").click();
+    buttonIn(row(1), "Modifier").click();
+
+    row(1).querySelector("input")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+
+    expect(row(1).querySelector("form")).toBeNull();
+    expect(document.activeElement).toBe(buttonIn(row(1), "Modifier"));
+  });
+
   it("deletes on Confirmer, the buttons disabled meanwhile and Escape ignored", () => {
     const run = render();
     buttonIn(row(1), "Supprimer").click();

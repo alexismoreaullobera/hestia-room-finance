@@ -14,24 +14,26 @@ internal static class WrittenRows
     /// <summary>The first month the input tests write to, years after the demo plan: no other test reads it.</summary>
     public static readonly DateOnly FirstTestMonth = new(2031, 1, 1);
 
-    /// <summary>The start of the name of every budget an input test creates: the budgets of the demo never have it.</summary>
+    /// <summary>The start of the name of every budget an input test creates, to tell them apart in the plan read back.</summary>
     public const string TestBudgetPrefix = "Test budget ";
 
     /// <summary>
-    /// Deletes what the input tests wrote: their months (settings, actuals, overrides) and their budgets (with their
-    /// actuals), so that what other classes read (the budgets of the plan, the number of actuals of a budget, the fixtures)
-    /// never depends on the order of the tests.
+    /// Deletes what the input tests wrote: their months (settings, actuals, overrides) and every budget that is not one
+    /// of the demo (with its actuals), whatever its name, so that what other classes read (the budgets of the plan, the
+    /// number of actuals of a budget, the fixtures) never depends on the order of the tests.
     /// </summary>
     public static async Task DeleteTestWritesAsync(McpServerFixture mcp)
     {
         await using var scope = mcp.Server.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
-        var token = TestContext.Current.CancellationToken;
+        // Never the token of the test: a test cancelled or timed out still leaves the database clean for the next ones.
+        var token = CancellationToken.None;
+        var demoBudgets = mcp.DemoBudgetIds;
 
         await context.MonthPlans.Where(p => p.Month >= FirstTestMonth).ExecuteDeleteAsync(token);
         await context.BudgetActuals.Where(a => a.Month >= FirstTestMonth).ExecuteDeleteAsync(token);
         await context.RecurringOverrides.Where(o => o.Month >= FirstTestMonth).ExecuteDeleteAsync(token);
-        await context.Budgets.Where(b => b.Name.StartsWith(TestBudgetPrefix)).ExecuteDeleteAsync(token);
+        await context.Budgets.Where(b => !demoBudgets.Contains(b.Id)).ExecuteDeleteAsync(token);
     }
 
     public static async Task<string> SnapshotAsync(McpServerFixture mcp)
