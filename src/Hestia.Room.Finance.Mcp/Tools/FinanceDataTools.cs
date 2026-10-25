@@ -92,7 +92,9 @@ public sealed class FinanceDataTools
     [McpServerTool(Name = "get_plan", Title = "Plan", ReadOnly = true, Idempotent = true, OpenWorld = false,
         UseStructuredContent = true, OutputSchemaType = typeof(PlanOutput))]
     [Description("The plan itself as it stands for a month: the budgets (variable expenses planned every month), with "
-        + "their planned amount and the number of months an actual was entered for.")]
+        + "their planned amount and the number of months an actual was entered for; and the recurring lines running during "
+        + "the month (incomes, fixed expenses, subscriptions), with every field and the number of months a correction was "
+        + "entered for.")]
     public static Task<CallToolResult> GetPlan(
         FinancePlanReader reader,
         FinanceClock clock,
@@ -105,7 +107,8 @@ public sealed class FinanceDataTools
     {
         var financeMonth = await reader.LoadMonthAsync(month, cancellationToken);
         var actualsByBudget = await reader.CountActualsByBudgetAsync(cancellationToken);
-        var output = PlanOutput.From(financeMonth, actualsByBudget);
+        var overridesByLine = await reader.CountOverridesByLineAsync(cancellationToken);
+        var output = PlanOutput.From(financeMonth, actualsByBudget, overridesByLine);
         return Result(output, output.Describe());
     }
 

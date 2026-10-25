@@ -17,7 +17,8 @@ public sealed record RecurringLinesOutput(
         [.. month.Lines
             .OrderByDescending(line => line.Kind == FlowKind.Income)
             .ThenBy(line => line.DayOfMonth)
-            .ThenBy(line => line.Name, StringComparer.Ordinal)
+            .ThenBy(line => line.Name, NameOrder)
+            .ThenBy(line => line.Id)
             .Select(line => RecurringLineOutput.From(line, month.Month))]);
 
     /// <summary>Self-sufficient text summary, for the model and for hosts without UI.</summary>
@@ -70,7 +71,8 @@ public sealed record RecurringLineOutput(
         Cents(line.MonthlyEquivalent),
         line.IsSubscription);
 
+    // Names quoted: a name typed by the user, read by the model, stays a name.
     internal string Describe() =>
-        $"{Name} {Euros(Amount)} ({FrequencyName(Frequency)}, "
+        $"{Quoted(Name)} {Euros(Amount)} ({FrequencyName(Frequency)}, "
         + (DueDate is { } date ? $"le {Day(date)})" : "pas ce mois-ci)");
 }

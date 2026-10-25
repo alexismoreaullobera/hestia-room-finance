@@ -29,10 +29,12 @@ public class SubscriptionsOutputTests
         var output = SubscriptionsOutput.From(April2026(0m,
         [
             Subscription("Forfait mobile", 12.99m, day: 8),
+            Subscription("Équipe", 9.99m, day: 8),
             Subscription("Box internet", 29.99m, day: 8),
         ]));
 
-        Assert.Equal(["Box internet", "Forfait mobile"], output.Subscriptions.Select(s => s.Name));
+        // In French: "Équipe" between "Box" and "Forfait", where an ordinal order would put it last.
+        Assert.Equal(["Box internet", "Équipe", "Forfait mobile"], output.Subscriptions.Select(s => s.Name));
     }
 
     [Fact]
@@ -82,7 +84,7 @@ public class SubscriptionsOutputTests
             text);
         Assert.Contains("débit le 03/04, engagement jusqu'au 31/12/2026)", text);
         // No commitment: the parenthesis closes right after the debit date.
-        Assert.Contains($"Streaming {13.49m.ToString("C", French)} (mensuel, débit le 20/04).", text);
+        Assert.Contains($"« Streaming » {13.49m.ToString("C", French)} (mensuel, débit le 20/04).", text);
     }
 
     [Fact]

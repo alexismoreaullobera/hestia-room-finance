@@ -24,7 +24,8 @@ public sealed record SubscriptionsOutput(
             month.Month.ToString(),
             [.. subscriptions
                 .OrderBy(line => line.DayOfMonth)
-                .ThenBy(line => line.Name, StringComparer.Ordinal)
+                .ThenBy(line => line.Name, NameOrder)
+                .ThenBy(line => line.Id)
                 .Select(line => SubscriptionOutput.From(line, month.Month))],
             // Sums of the exact amounts, rounded once: never a sum of rounded amounts.
             Cents(subscriptions.Sum(line => line.MonthlyEquivalent)),
@@ -73,7 +74,8 @@ public sealed record SubscriptionOutput(
         line.Subscription?.CommitmentEndDate);
 
     internal string Describe() =>
-        $"{Name} {Euros(Amount)} ({FrequencyName(Frequency)}, "
+        // Names quoted: a name typed by the user, read by the model, stays a name.
+        $"{Quoted(Name)} {Euros(Amount)} ({FrequencyName(Frequency)}, "
         + (DueDate is { } date ? $"débit le {Day(date)}" : "pas de débit ce mois-ci")
         + (CommitmentEndDate is { } end ? $", engagement jusqu'au {FullDate(end)})" : ")");
 }

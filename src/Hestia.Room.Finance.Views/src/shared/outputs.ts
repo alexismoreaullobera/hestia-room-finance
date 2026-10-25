@@ -96,11 +96,31 @@ export interface PlanBudgetOutput {
   actualsEntered: number;
 }
 
+/** A recurring line of the plan; overridesEntered is the number of months a correction was entered for. */
+export interface PlanLineOutput {
+  id: string;
+  name: string;
+  kind: FlowKind;
+  amount: number;
+  frequency: Frequency;
+  dayOfMonth: number;
+  /** 1 to 12 for a quarterly or yearly line, null for a monthly one. */
+  anchorMonth: number | null;
+  startDate: string;
+  endDate: string | null;
+  category: Category;
+  isSubscription: boolean;
+  commitmentEndDate: string | null;
+  overridesEntered: number;
+}
+
 /** show_plan (and get_plan). */
 export interface PlanOutput {
   month: string;
   /** By name. */
   budgets: PlanBudgetOutput[];
+  /** The lines running during the month: incomes first, then by day and by name. */
+  lines: PlanLineOutput[];
 }
 
 /** show_subscriptions (and list_subscriptions). */
