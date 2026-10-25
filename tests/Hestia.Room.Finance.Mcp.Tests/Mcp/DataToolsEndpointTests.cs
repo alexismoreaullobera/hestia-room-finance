@@ -91,6 +91,14 @@ public class DataToolsEndpointTests(McpServerFixture mcp)
         Assert.Equal(expected.Actual.Budgets, (decimal?)content["actual"]?["budgets"]);
         Assert.Equal(expected.Actual.RecurringExpenses, (decimal?)content["actual"]?["recurringExpenses"]);
         Assert.NotEqual(expected.Planned.Budgets, expected.Actual.Budgets);
+        // The detail behind the totals: each budget with its actual, each line due with what happened.
+        Assert.Equal(
+            expected.Budgets.Select(b => (b.Name, b.Actual, b.Entered)),
+            content["budgets"]!.AsArray().Select(b => ((string)b!["name"]!, (decimal)b["actual"]!, (bool)b["entered"]!)));
+        Assert.Contains(expected.Budgets, b => b.Entered);
+        Assert.Equal(
+            expected.Lines.Select(l => (l.Name, l.Actual, l.Status.ToString())),
+            content["lines"]!.AsArray().Select(l => ((string)l!["name"]!, (decimal)l["actual"]!, (string)l["status"]!)));
     }
 
     [Fact]

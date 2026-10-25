@@ -1,6 +1,7 @@
 import type { CashFlowForecastOutput, DailyBalanceOutput, DebitOutput } from "./shared/outputs";
 import { amount, card, cardContent, element, svg } from "./shared/dom";
-import { formatAmount, formatDay, formatEuros, formatMonth, parseEuros } from "./shared/format";
+import { formatDay, formatEuros, formatMonth } from "./shared/format";
+import { amountForm } from "./shared/form";
 import type { ViewContext, ViewDefinition } from "./shared/view";
 import "./cash-flow-forecast.css";
 
@@ -125,52 +126,19 @@ function startingBalanceCard({ month, startingBalance }: CashFlowForecastOutput,
   }
 
   function showForm(): void {
-    // The month in the accessible name: a screen reader says which month is changed.
-    const field = element("input", {
-      attributes: { type: "text", inputmode: "decimal", autocomplete: "off", "aria-label": `Solde de départ de ${formatMonth(month)}` },
+    const { form, focus } = amountForm({
+      title: "Solde de départ",
+      // The month in the accessible name: a screen reader says which month is changed.
+      label: `Solde de départ de ${formatMonth(month)}`,
+      value: startingBalance,
+      submit: (value) => call(SET_STARTING_BALANCE, { month, startingBalance: value }),
+      cancel: () => { showValue(true); },
+      // The view was redrawn from the result, this form with it: the focus goes to the new card's button.
+      afterShown: () => { document.querySelector<HTMLButtonElement>(".starting-balance .edit")?.focus(); },
     });
-    field.value = formatAmount(startingBalance);
-    const save = element("button", { attributes: { type: "submit" } }, "Enregistrer");
-    const cancel = element("button", { attributes: { type: "button" } }, "Annuler");
-    const problem = element("div", { className: "field-error", attributes: { role: "alert" } });
-    const setBusy = (busy: boolean) => { for (const control of [field, save, cancel]) control.disabled = busy; };
-    const form = element("form", {},
-      element("div", { className: "title", text: "Solde de départ" }),
-      field,
-      element("div", { className: "actions" }, save, cancel),
-      problem);
-
-    form.addEventListener("submit", (event) => {
-      // Never the default submission: it would navigate the frame of the view.
-      event.preventDefault();
-      const value = parseEuros(field.value);
-      if (value === null) {
-        problem.textContent = "Montant attendu, par exemple 1 250,50.";
-        field.focus();
-        return;
-      }
-      problem.textContent = "";
-      setBusy(true);
-      void call(SET_STARTING_BALANCE, { month, startingBalance: value }).then((shown) => {
-        if (shown) {
-          // The view was redrawn from the result, this form with it: the focus goes to the new card's button.
-          document.querySelector<HTMLButtonElement>(".starting-balance .edit")?.focus();
-          return;
-        }
-        // Not shown (refused, failed, or overtaken by a newer result): enabled again as typed.
-        setBusy(false);
-        field.focus();
-      });
-    });
-    cancel.addEventListener("click", () => { showValue(true); });
-    form.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") showValue(true);
-    });
-
     node.classList.add("editing");
     node.replaceChildren(form);
-    field.focus();
-    field.select();
+    focus();
   }
 
   showValue();

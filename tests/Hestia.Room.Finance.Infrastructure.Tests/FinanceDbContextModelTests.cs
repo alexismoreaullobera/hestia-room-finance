@@ -91,6 +91,7 @@ public class FinanceDbContextModelTests
     [InlineData("CK_RecurringLines_AnchorMonth")]
     [InlineData("CK_Budgets_PlannedAmount")]
     [InlineData("CK_MonthPlans_Month")]
+    [InlineData("CK_MonthPlans_StartingBalance")]
     [InlineData("CK_BudgetActuals_Amount")]
     [InlineData("CK_BudgetActuals_Month")]
     [InlineData("CK_RecurringOverrides_ActualAmount")]

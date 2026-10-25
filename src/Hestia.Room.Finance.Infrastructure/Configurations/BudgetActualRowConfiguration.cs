@@ -10,7 +10,7 @@ internal sealed class BudgetActualRowConfiguration : IEntityTypeConfiguration<Bu
     {
         actual.ToTable("BudgetActuals", table =>
         {
-            table.HasCheckConstraint("CK_BudgetActuals_Amount", "[Amount] >= 0");
+            table.HasCheckConstraint("CK_BudgetActuals_Amount", $"[Amount] BETWEEN 0 AND {AmountBound.Sql}");
             table.HasCheckConstraint("CK_BudgetActuals_Month", "DAY([Month]) = 1");
         });
 

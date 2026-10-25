@@ -23,13 +23,18 @@ public sealed class FinanceDataTools
         UseStructuredContent = true, OutputSchemaType = typeof(MonthSummaryOutput))]
     [Description("Planned and actual summary of a month: incomes, recurring expenses, budgets and savings capacity, "
         + "as falling due this month and smoothed over the year.")]
-    public static async Task<CallToolResult> GetMonthSummary(
+    public static Task<CallToolResult> GetMonthSummary(
         FinancePlanReader reader,
         FinanceClock clock,
         [Description(MonthArgument.Description)] string? month = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        MonthSummaryAsync(reader, MonthArgument.Resolve(month, clock), cancellationToken);
+
+    /// <summary>The result of get_month_summary for a month already resolved: also what an input tool returns.</summary>
+    internal static async Task<CallToolResult> MonthSummaryAsync(
+        FinancePlanReader reader, YearMonth month, CancellationToken cancellationToken)
     {
-        var financeMonth = await reader.LoadMonthAsync(MonthArgument.Resolve(month, clock), cancellationToken);
+        var financeMonth = await reader.LoadMonthAsync(month, cancellationToken);
         var output = MonthSummaryOutput.From(financeMonth);
         return Result(output, output.Describe());
     }

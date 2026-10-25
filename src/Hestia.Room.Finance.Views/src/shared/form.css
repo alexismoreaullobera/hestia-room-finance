@@ -1,0 +1,30 @@
+/* The amount form of the views (form.ts), and the Modifier button that opens one. */
+.amount-form button,
+.amount-form input,
+button.edit {
+  font: inherit;
+  color: var(--fg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+.amount-form button,
+button.edit { padding: 2px 10px; cursor: pointer; }
+.amount-form button:hover:not(:disabled),
+button.edit:hover { border-color: var(--accent); }
+.amount-form button:focus-visible,
+.amount-form input:focus-visible,
+button.edit:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.amount-form button:disabled,
+.amount-form input:disabled { opacity: .5; cursor: default; }
+button.edit { font-size: 12px; }
+.amount-form input {
+  width: 100%;
+  margin: 4px 0 6px;
+  padding: 4px 8px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.amount-form .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.amount-form .field-error { color: var(--negative); font-size: 12px; margin-top: 4px; }
+.amount-form .field-error:empty { display: none; }

@@ -99,6 +99,30 @@ public class DatabaseTests(SqlServerFixture sqlServer)
         "CK_RecurringLines_DayOfMonth")]
     [InlineData("INSERT INTO finance.MonthPlans (Month, StartingBalance) VALUES ('2026-04-15', 0)",
         "CK_MonthPlans_Month")]
+    // The amount bound of the domain (999 999 999,99 either way) on the amounts the user types.
+    [InlineData("INSERT INTO finance.MonthPlans (Month, StartingBalance) VALUES ('2026-04-01', -1000000000)",
+        "CK_MonthPlans_StartingBalance")]
+    [InlineData("INSERT INTO finance.MonthPlans (Month, StartingBalance) VALUES ('2026-04-01', 1000000000)",
+        "CK_MonthPlans_StartingBalance")]
+    // The rules the bound migration re-created: an actual is never negative, a correction never 0 nor negative.
+    [InlineData("INSERT INTO finance.Budgets (Id, Name, PlannedAmount) VALUES (NEWID(), 'Courses', 200); "
+        + "INSERT INTO finance.BudgetActuals (BudgetId, Month, Amount) SELECT Id, '2026-04-01', -1 FROM finance.Budgets",
+        "CK_BudgetActuals_Amount")]
+    [InlineData("INSERT INTO finance.RecurringLines (Id, Kind, Name, Amount, Frequency, DayOfMonth, StartDate, Category, IsSubscription) "
+        + "VALUES (NEWID(), 'Expense', 'Loyer', 650, 'Monthly', 5, '2025-01-01', 'Housing', 0); "
+        + "INSERT INTO finance.RecurringOverrides (LineId, Month, ActualAmount) SELECT Id, '2026-04-01', 0 FROM finance.RecurringLines",
+        "CK_RecurringOverrides_ActualAmount")]
+    [InlineData("INSERT INTO finance.RecurringLines (Id, Kind, Name, Amount, Frequency, DayOfMonth, StartDate, Category, IsSubscription) "
+        + "VALUES (NEWID(), 'Expense', 'Loyer', 650, 'Monthly', 5, '2025-01-01', 'Housing', 0); "
+        + "INSERT INTO finance.RecurringOverrides (LineId, Month, ActualAmount) SELECT Id, '2026-04-01', -1 FROM finance.RecurringLines",
+        "CK_RecurringOverrides_ActualAmount")]
+    [InlineData("INSERT INTO finance.Budgets (Id, Name, PlannedAmount) VALUES (NEWID(), 'Courses', 200); "
+        + "INSERT INTO finance.BudgetActuals (BudgetId, Month, Amount) SELECT Id, '2026-04-01', 1000000000 FROM finance.Budgets",
+        "CK_BudgetActuals_Amount")]
+    [InlineData("INSERT INTO finance.RecurringLines (Id, Kind, Name, Amount, Frequency, DayOfMonth, StartDate, Category, IsSubscription) "
+        + "VALUES (NEWID(), 'Expense', 'Loyer', 650, 'Monthly', 5, '2025-01-01', 'Housing', 0); "
+        + "INSERT INTO finance.RecurringOverrides (LineId, Month, ActualAmount) SELECT Id, '2026-04-01', 1000000000 FROM finance.RecurringLines",
+        "CK_RecurringOverrides_ActualAmount")]
     public async Task CheckConstraints_RejectAValueWrittenOutsideTheDomain(string insert, string constraint)
     {
         await using var context = new FinanceDbContext(await sqlServer.CreateMigratedDatabaseAsync());

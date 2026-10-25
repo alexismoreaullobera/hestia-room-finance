@@ -1,7 +1,4 @@
 using System.Text.Json.Nodes;
-using Hestia.Room.Finance.Infrastructure;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
 
@@ -96,7 +93,7 @@ public class InputToolsEndpointTests(McpServerFixture mcp)
     [MemberData(nameof(InvalidCalls))]
     public async Task ToolsCall_WithInvalidArguments_IsAToolError_AndWritesNothing(string arguments, string expectedMessage)
     {
-        var before = await MonthPlansAsync();
+        var before = await WrittenRows.SnapshotAsync(mcp);
 
         var result = await _mcp.CallToolAsync("set_starting_balance", JsonNode.Parse(arguments)!.AsObject());
 
@@ -105,7 +102,7 @@ public class InputToolsEndpointTests(McpServerFixture mcp)
         Assert.Contains(expectedMessage, Text(result));
         // Nothing written anywhere: not 2031-02, and not the current month a wrong fallback would write to (the demo
         // month the other classes of the collection read). The tests of a collection run one after the other.
-        Assert.Equal(before, await MonthPlansAsync());
+        Assert.Equal(before, await WrittenRows.SnapshotAsync(mcp));
     }
 
     [Fact]
@@ -117,15 +114,6 @@ public class InputToolsEndpointTests(McpServerFixture mcp)
 
         Assert.NotEqual(true, (bool?)result["isError"]);
         Assert.Equal(12.5m, await StartingBalanceAsync("2031-05"));
-    }
-
-    /// <summary>Every saved month setting, read straight from the database: tells a row at 0 € from no row at all.</summary>
-    private async Task<List<(DateOnly Month, decimal StartingBalance)>> MonthPlansAsync()
-    {
-        using var scope = mcp.Server.Services.CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
-        var rows = await context.MonthPlans.AsNoTracking().OrderBy(p => p.Month).ToListAsync(TestContext.Current.CancellationToken);
-        return rows.Select(p => (p.Month, p.StartingBalance)).ToList();
     }
 
     private Task<JsonNode> SetAsync(string month, decimal startingBalance) =>

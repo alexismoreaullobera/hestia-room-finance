@@ -82,7 +82,7 @@ public class FinancePlanWriterTests(SqlServerFixture sqlServer)
         // the other save from an interceptor, right before the writer's save.
         var options = await sqlServer.CreateMigratedDatabaseAsync();
         var racing = new DbContextOptionsBuilder<FinanceDbContext>(options)
-            .AddInterceptors(new OtherSaveFirst(options, new MonthPlan(April, 150m)))
+            .AddInterceptors(new OtherSaveFirst(options, new MonthPlan(April, 150m).ToRow()))
             .Options;
 
         await SetAsync(racing, new MonthPlan(April, -42.50m));
@@ -93,8 +93,11 @@ public class FinancePlanWriterTests(SqlServerFixture sqlServer)
         Assert.Equal(1, await context.MonthPlans.CountAsync(Token));
     }
 
-    /// <summary>Saves another plan through its own context, once, just before the first save of the intercepted one.</summary>
-    private sealed class OtherSaveFirst(DbContextOptions<FinanceDbContext> options, MonthPlan other) : SaveChangesInterceptor
+    /// <summary>
+    /// Saves another row through its own context, once, just before the first save of the intercepted context: the race
+    /// of two first saves of the same key, made deterministic. Shared with the tests of the actuals.
+    /// </summary>
+    internal sealed class OtherSaveFirst(DbContextOptions<FinanceDbContext> options, object otherRow) : SaveChangesInterceptor
     {
         private bool _done;
 
@@ -105,7 +108,7 @@ public class FinancePlanWriterTests(SqlServerFixture sqlServer)
             {
                 _done = true;
                 await using var otherContext = new FinanceDbContext(options);
-                otherContext.MonthPlans.Add(other.ToRow());
+                otherContext.Add(otherRow);
                 await otherContext.SaveChangesAsync(cancellationToken);
             }
 

@@ -32,6 +32,7 @@ internal static class TestMonth
         decimal startingBalance,
         IEnumerable<RecurringLine> lines,
         IEnumerable<Budget>? budgets = null,
-        IEnumerable<BudgetActual>? actuals = null) =>
-        new(new MonthPlan(April, startingBalance), lines, budgets ?? [], actuals ?? [], []);
+        IEnumerable<BudgetActual>? actuals = null,
+        IEnumerable<RecurringOverride>? overrides = null) =>
+        new(new MonthPlan(April, startingBalance), lines, budgets ?? [], actuals ?? [], overrides ?? []);
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Hestia.Room.Finance.Domain;
+using Hestia.Room.Finance.Mcp.Tools;
 using Hestia.Room.Finance.Mcp.Views;
 
 namespace Hestia.Room.Finance.Mcp.Tests.Mcp;
@@ -26,12 +27,13 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
     private static readonly string[] DataTools = ["get_month_summary", "get_cash_flow_forecast", "list_recurring_lines", "list_subscriptions"];
 
-    private static readonly string[] InputTools = ["set_starting_balance"];
+    private static readonly string[] InputTools = ["set_starting_balance", "set_budget_actual", "set_line_actual"];
 
     /// <summary>The input tools each view calls from its forms (literals too: renaming one must break the views).</summary>
     private static readonly Dictionary<string, string[]> InputToolsOfViews = new()
     {
         ["ui://finance/cash-flow-forecast.html"] = ["set_starting_balance"],
+        ["ui://finance/month-overview.html"] = ["set_budget_actual", "set_line_actual"],
     };
 
     public static TheoryData<string, string, string> ViewToolsViewsAndTitles =>
@@ -200,7 +202,7 @@ public partial class McpEndpointTests(McpServerFixture mcp)
     }
 
     [Fact]
-    public void ViewsOutputs_DeclareExactlyTheFrequenciesAndCategories()
+    public void ViewsOutputs_DeclareExactlyTheEnumsOfTheOutputs()
     {
         // The TypeScript unions of outputs.ts equal the domain enums; the views translate every value of the
         // unions (a Record over them), so a new value of the domain cannot show up untranslated.
@@ -208,6 +210,8 @@ public partial class McpEndpointTests(McpServerFixture mcp)
 
         Assert.Equal(Enum.GetNames<Frequency>().Order(), Union(outputs, "Frequency").Order());
         Assert.Equal(Enum.GetNames<Category>().Order(), Union(outputs, "Category").Order());
+        Assert.Equal(Enum.GetNames<FlowKind>().Order(), Union(outputs, "FlowKind").Order());
+        Assert.Equal(Enum.GetNames<LineActualStatus>().Order(), Union(outputs, "LineActualStatus").Order());
     }
 
     [Fact]
@@ -235,12 +239,15 @@ public partial class McpEndpointTests(McpServerFixture mcp)
         Assert.Equal(0m, await StartingBalanceAsync("2031-06"));
     }
 
-    [Fact]
-    public async Task Request_FromAnAllowedHostOrigin_IsServed()
+    [Theory]
+    [InlineData("http://localhost:8080")]
+    [InlineData("http://localhost:6274")]
+    public async Task Request_FromAnAllowedHostOrigin_IsServed(string origin)
     {
-        // The origin of a local web host allowed in Development (Cors:DevMcpHostOrigins).
+        // The origins of the local web hosts allowed in Development (Cors:DevMcpHostOrigins): a future Hestia shell, and
+        // the MCP Inspector, whose page sends its own origin (refused by T9 until the Inspector check of T10).
         using var request = McpTestClient.CreateRequest("tools/list");
-        request.Headers.Add("Origin", "http://localhost:8080");
+        request.Headers.Add("Origin", origin);
 
         using var response = await _mcp.Http.SendAsync(request, TestContext.Current.CancellationToken);
 

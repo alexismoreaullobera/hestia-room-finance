@@ -1,3 +1,19 @@
 .cards { --card-min: 200px; }
 .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
 tr.total td { font-weight: 600; }
+
+/* The tables of actuals: each row editable in place (option A), with the amount form of the kit. */
+td.action { width: 1%; text-align: right; }
+td .detail { display: block; color: var(--muted); font-size: 12px; }
+tr.editing td { background: var(--surface); }
+tr.editing .amount-form { max-width: 360px; }
+.badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+.badge.skipped { border-color: var(--alert-line); color: var(--negative); }
