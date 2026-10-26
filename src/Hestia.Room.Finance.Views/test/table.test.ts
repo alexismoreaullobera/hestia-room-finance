@@ -122,6 +122,8 @@ describe("editableTable", () => {
     render({ actions: [{ label: "Terminer", className: "end", form: ending }] });
 
     expect(names(row(1))).toEqual(["Modifier", "Terminer", "Supprimer"]);
+    // Styled like every button of the kit, never left to the default of the browser.
+    expect([...row(1).querySelectorAll("button")].map(b => b.className)).toEqual(["edit", "end row-action", "remove"]);
     buttonIn(row(1), "Terminer").click();
 
     expect(ending).toHaveBeenCalledOnce();
@@ -137,6 +139,18 @@ describe("editableTable", () => {
     buttonIn(row(1), "Terminer").click();
 
     buttonIn(row(1), "Annuler").click();
+
+    expect(row(1).querySelector("form")).toBeNull();
+    expect(document.activeElement).toBe(buttonIn(row(1), "Terminer"));
+  });
+
+  it("gives the row back on Escape in the date of another action, the focus on its button", () => {
+    render({ actions: [{ label: "Terminer", className: "end", form: closing => recordForm({
+      ...closing, title: "Terminer", fields: [{ kind: "date", name: "endDate", label: "Dernier jour", value: "2027-03-31" }], submit: pending,
+    }) }] });
+    buttonIn(row(1), "Terminer").click();
+
+    row(1).querySelector("input")!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 
     expect(row(1).querySelector("form")).toBeNull();
     expect(document.activeElement).toBe(buttonIn(row(1), "Terminer"));

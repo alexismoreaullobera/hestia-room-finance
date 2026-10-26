@@ -10,6 +10,7 @@ tr.editing .amount-form { max-width: 360px; }
 td:not(.action),
 .amount-form .title,
 .confirmation { overflow-wrap: anywhere; }
+button.row-action,
 button.remove,
 button.confirm,
 button.cancel,
@@ -24,9 +25,11 @@ button.new {
   cursor: pointer;
 }
 button.confirm { border-color: var(--alert-line); color: var(--negative); }
+button.row-action:hover,
 button.remove:hover,
 button.cancel:hover:not(:disabled),
 button.new:hover { border-color: var(--accent); }
+button.row-action:focus-visible,
 button.remove:focus-visible,
 button.confirm:focus-visible,
 button.cancel:focus-visible,

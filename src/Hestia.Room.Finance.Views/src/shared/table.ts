@@ -91,7 +91,8 @@ export function editableRow(table: string, columns: number, { key, cells, form, 
     edit.addEventListener("click", () => { showForm(form, "edit"); });
     const buttons: HTMLElement[] = [edit];
     for (const action of actions) {
-      const opener = button(action.label, action.className);
+      // Its own class to find it again, the class of the kit for its style (never left to the browser).
+      const opener = button(action.label, `${action.className} row-action`);
       opener.addEventListener("click", () => { showForm(action.form, action.className); });
       buttons.push(opener);
     }
