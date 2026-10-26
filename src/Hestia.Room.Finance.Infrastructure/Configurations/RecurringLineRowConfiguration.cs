@@ -26,8 +26,9 @@ internal sealed class RecurringLineRowConfiguration : IEntityTypeConfiguration<R
         line.Property(l => l.Id).ValueGeneratedNever();
 
         line.Property(l => l.Name).HasMaxLength(NameLimit.MaxLength).UseCollation(NameColumn.Collation);
-        // Two lines never share a name, ended ones included: checked by the domain (PlanLines), and here in the last resort.
-        line.HasIndex(l => l.Name).IsUnique().HasDatabaseName(NameIndex);
+        // Two lines never share a name at the same time: checked by the domain (PlanLines), and here in the last resort for
+        // the lines without end, which always run together (an index cannot compare two periods).
+        line.HasIndex(l => l.Name).IsUnique().HasFilter("[EndDate] IS NULL").HasDatabaseName(NameIndex);
 
         // Enums stored as text: readable in SQL, and robust to a reordering of the enum members.
         line.Property(l => l.Kind).HasConversion<string>().HasMaxLength(20);

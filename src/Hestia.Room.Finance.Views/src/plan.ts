@@ -22,18 +22,20 @@ export const DELETE_LINE = "delete_line";
 const MAX_NAME_LENGTH = 100;
 
 /**
- * The check of a name of the plan, here for a clear message before any call: the server checks the same rules (and the
- * characters a field cannot hold anyway, such as line breaks), the view may only be faster. Among the items shown only:
- * for the lines, an ended one is out of the view, the server refusing its name.
+ * The checks of a name of the plan, here for a clear message before any call: the server checks the same rules (and the
+ * characters a field cannot hold anyway, such as line breaks), the view may only be faster.
  */
-function nameCheck(items: readonly { id: string; name: string }[], except: string | null, taken: string) {
-  return (name: string): string | null => {
-    if (name === "") return "Nom attendu.";
-    if (name.length > MAX_NAME_LENGTH) return `${String(MAX_NAME_LENGTH)} caractères au plus.`;
-    // Ignoring case, as the server: "Courses" and "courses" would read as the same item.
-    const used = items.some(item => item.id !== except && item.name.toLocaleLowerCase("fr") === name.toLocaleLowerCase("fr"));
-    return used ? taken : null;
-  };
+function nameRule(name: string): string | null {
+  if (name === "") return "Nom attendu.";
+  return name.length > MAX_NAME_LENGTH ? `${String(MAX_NAME_LENGTH)} caractères au plus.` : null;
+}
+
+/** Ignoring case, as the server: "Courses" and "courses" would read as the same item. */
+const sameName = (name: string, other: string) => name.toLocaleLowerCase("fr") === other.toLocaleLowerCase("fr");
+
+function budgetNameCheck(budgets: readonly PlanBudgetOutput[], except: string | null) {
+  return (name: string): string | null =>
+    nameRule(name) ?? (budgets.some(budget => budget.id !== except && sameName(budget.name, name)) ? "Un autre budget porte déjà ce nom." : null);
 }
 
 function positive(value: number): string | null {
@@ -43,8 +45,7 @@ function positive(value: number): string | null {
 /** The two fields of a budget, prefilled with the budget changed, empty for a new one. */
 function budgetFields(budgets: readonly PlanBudgetOutput[], budget: PlanBudgetOutput | null): Field[] {
   return [
-    { kind: "text", name: "name", label: "Nom", value: budget?.name ?? "",
-      check: nameCheck(budgets, budget?.id ?? null, "Un autre budget porte déjà ce nom.") },
+    { kind: "text", name: "name", label: "Nom", value: budget?.name ?? "", check: budgetNameCheck(budgets, budget?.id ?? null) },
     { kind: "amount", name: "plannedAmount", label: "Par mois", value: budget?.plannedAmount ?? null, check: positive },
   ];
 }
@@ -115,11 +116,10 @@ function lineDeleteConfirmation({ name, overridesEntered }: PlanLineOutput): str
 }
 
 /** The fields of a line, prefilled with the line changed, or with the defaults of a new one starting the month shown. */
-function lineFields(lines: readonly PlanLineOutput[], line: PlanLineOutput | null, month: string): Field[] {
+function lineFields(line: PlanLineOutput | null, month: string): Field[] {
   return [
     { kind: "select", name: "kind", label: "Type", value: line?.kind ?? "Expense", options: options(kinds) },
-    { kind: "text", name: "name", label: "Nom", value: line?.name ?? "",
-      check: nameCheck(lines, line?.id ?? null, "Une autre ligne porte déjà ce nom.") },
+    { kind: "text", name: "name", label: "Nom", value: line?.name ?? "", check: nameRule },
     { kind: "amount", name: "amount", label: "Montant", value: line?.amount ?? null, check: positive },
     { kind: "select", name: "category", label: "Catégorie", value: line?.category ?? "Other", options: options(categories) },
     { kind: "select", name: "frequency", label: "Fréquence", value: line?.frequency ?? "Monthly", options: options(frequencies) },
@@ -135,11 +135,24 @@ function lineFields(lines: readonly PlanLineOutput[], line: PlanLineOutput | nul
   ];
 }
 
-/** Dates as YYYY-MM-DD compare as text. */
-function endBeforeStart({ startDate, endDate }: FormValues) {
-  return typeof endDate === "string" && typeof startDate === "string" && endDate < startDate
-    ? { field: "endDate", message: "La fin ne peut pas précéder le début." }
-    : null;
+/** Dates as YYYY-MM-DD compare as text; a line without end runs forever. */
+function runTogether(start: string, end: string | null, otherStart: string, otherEnd: string | null): boolean {
+  return start <= (otherEnd ?? "9999-12-31") && otherStart <= (end ?? "9999-12-31");
+}
+
+/**
+ * The checks of a line across its fields: an end never before the start, and a name no other line shown uses at the
+ * same time (two lines share a name only one after the other, such as a rent ended in December and one from January).
+ */
+function lineCheck(lines: readonly PlanLineOutput[], except: string | null) {
+  return ({ name, startDate, endDate }: FormValues) => {
+    if (typeof startDate !== "string" || typeof name !== "string") return null;
+    const end = typeof endDate === "string" ? endDate : null;
+    if (end !== null && end < startDate) return { field: "endDate", message: "La fin ne peut pas précéder le début." };
+    const taken = lines.some(other => other.id !== except && sameName(other.name, name)
+      && runTogether(startDate, end, other.startDate, other.endDate));
+    return taken ? { field: "name", message: "Une autre ligne porte déjà ce nom sur la même période." } : null;
+  };
 }
 
 /** The arguments of create_line and update_line: the month of the list as a number, the fields not shown as null. */
@@ -147,9 +160,11 @@ function lineArguments(values: FormValues): Readonly<Record<string, unknown>> {
   return { ...values, anchorMonth: values.anchorMonth === null ? null : Number(values.anchorMonth) };
 }
 
-function lineCells(line: PlanLineOutput): HTMLElement[] {
+function lineCells(line: PlanLineOutput, lastDay: string): HTMLElement[] {
   const details = [
     line.kind === "Income" ? "entrée" : null,
+    // Saved for later: in sight from the month shown on, with its start.
+    line.startDate > lastDay ? `à partir du ${formatDate(line.startDate)}` : null,
     dueMonths(line),
     line.endDate ? `jusqu'au ${formatDate(line.endDate)}` : null,
     line.commitmentEndDate ? `engagement jusqu'au ${formatDate(line.commitmentEndDate)}` : null,
@@ -169,12 +184,12 @@ function linesTable({ month, lines }: PlanOutput, call: ViewContext["call"]): HT
   const headers = [{ text: "Jour" }, { text: "Ligne" }, { text: "Fréquence" }, { text: "Montant", amount: true }];
   return editableTable("lines", "Lignes récurrentes", headers, lines, (line): EditableRow => ({
     key: line.id,
-    cells: () => lineCells(line),
+    cells: () => lineCells(line, lastDayOf(month)),
     form: (closing: Closing) => recordForm({
       ...closing,
       title: line.name,
-      fields: lineFields(lines, line, month),
-      check: endBeforeStart,
+      fields: lineFields(line, month),
+      check: lineCheck(lines, line.id),
       submit: values => call(UPDATE_LINE, { month, lineId: line.id, ...lineArguments(values) }),
     }),
     actions: [{
@@ -183,10 +198,13 @@ function linesTable({ month, lines }: PlanOutput, call: ViewContext["call"]): HT
       form: (closing: Closing) => recordForm({
         ...closing,
         title: `Terminer ${line.name}`,
-        fields: [{ kind: "date", name: "endDate", label: "Dernier jour", value: lastDayOf(month) }],
-        check: ({ endDate }) => typeof endDate === "string" && endDate < line.startDate
-          ? { field: "endDate", message: "La fin ne peut pas précéder le début de la ligne." }
-          : null,
+        // An ended line keeps its end: a quick Enregistrer never extends it.
+        fields: [{ kind: "date", name: "endDate", label: "Dernier jour", value: line.endDate ?? lastDayOf(month) }],
+        check: ({ endDate }) => {
+          if (typeof endDate !== "string") return null;
+          if (endDate < line.startDate) return { field: "endDate", message: "La fin ne peut pas précéder le début de la ligne." };
+          return lineCheck(lines, line.id)({ name: line.name, startDate: line.startDate, endDate });
+        },
         submit: ({ endDate }) => call(END_LINE, { month, lineId: line.id, endDate }),
       }),
     }],
@@ -200,8 +218,8 @@ function linesTable({ month, lines }: PlanOutput, call: ViewContext["call"]): HT
     form: (closing: Closing) => recordForm({
       ...closing,
       title: "Nouvelle ligne",
-      fields: lineFields(lines, null, month),
-      check: endBeforeStart,
+      fields: lineFields(null, month),
+      check: lineCheck(lines, null),
       submit: values => call(CREATE_LINE, { month, ...lineArguments(values) }),
     }),
   });

@@ -1,3 +1,4 @@
+using System.Data;
 using Hestia.Room.Finance.Domain;
 using Hestia.Room.Finance.Infrastructure.Configurations;
 using Hestia.Room.Finance.Infrastructure.Rows;
@@ -14,8 +15,9 @@ namespace Hestia.Room.Finance.Infrastructure;
 /// and <see cref="FinanceMonth"/> (a budget of the plan, a line due that month). The database constraints are a further
 /// check. The last save wins: the room has a single user. Two first saves of the same key end with the last value. A
 /// name taken meanwhile fails with <see cref="NameTakenException"/>; a budget or line updated after its deletion, with an
-/// <see cref="InvalidOperationException"/>; a save meeting a concurrent clear, or an actual or override of a budget or
-/// line deleted meanwhile, with the database error.
+/// <see cref="InvalidOperationException"/> (a <see cref="DbUpdateConcurrencyException"/> when deleted between the read
+/// and the save); a save meeting a concurrent clear, or an actual or override of a budget or line deleted meanwhile, with
+/// the database error.
 /// </summary>
 public sealed class FinancePlanWriter(FinanceDbContext context)
 {
@@ -58,10 +60,15 @@ public sealed class FinancePlanWriter(FinanceDbContext context)
 
     /// <summary>
     /// Deletes a budget and, with it, every actual entered for it (the cascade of the foreign key): a budget has no dates,
-    /// so this is for a mistake, the view asking for a confirmation. Nothing to delete is not an error.
+    /// so this is for a mistake, the view asking for a confirmation that announced <paramref name="actualsEntered"/>
+    /// actuals. Nothing is deleted when that number changed (false). Nothing to delete is not an error.
     /// </summary>
-    public Task DeleteBudgetAsync(Guid budgetId, CancellationToken cancellationToken = default) =>
-        context.Budgets.Where(budget => budget.Id == budgetId).ExecuteDeleteAsync(cancellationToken);
+    public Task<bool> DeleteBudgetAsync(Guid budgetId, int actualsEntered, CancellationToken cancellationToken = default) =>
+        DeleteAsAnnouncedAsync(
+            () => context.BudgetActuals.CountAsync(actual => actual.BudgetId == budgetId, cancellationToken),
+            actualsEntered,
+            () => context.Budgets.Where(budget => budget.Id == budgetId).ExecuteDeleteAsync(cancellationToken),
+            cancellationToken);
 
     /// <summary>
     /// Adds a recurring line to the plan. Its name is checked free by <see cref="PlanLines"/>; one taken meanwhile is
@@ -91,11 +98,32 @@ public sealed class FinancePlanWriter(FinanceDbContext context)
     }
 
     /// <summary>
-    /// Deletes a recurring line and, with it, every override entered for it (the cascade of the foreign key): for a
-    /// mistake, the view asking for a confirmation; a line that stops is ended instead. Nothing to delete is not an error.
+    /// Ends a recurring line (the line ended by <see cref="PlanLines.End"/>): its end date only, never the other columns
+    /// as read before, which a change saved meanwhile would get back. A line deleted meanwhile fails with an
+    /// <see cref="InvalidOperationException"/>.
     /// </summary>
-    public Task DeleteLineAsync(Guid lineId, CancellationToken cancellationToken = default) =>
-        context.RecurringLines.Where(line => line.Id == lineId).ExecuteDeleteAsync(cancellationToken);
+    public async Task EndLineAsync(Guid lineId, DateOnly endDate, CancellationToken cancellationToken = default)
+    {
+        var ended = await context.RecurringLines
+            .Where(line => line.Id == lineId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(line => line.EndDate, endDate), cancellationToken);
+        if (ended == 0)
+        {
+            throw new InvalidOperationException("The recurring line was deleted meanwhile.");
+        }
+    }
+
+    /// <summary>
+    /// Deletes a recurring line and, with it, every override entered for it (the cascade of the foreign key): for a
+    /// mistake, the view asking for a confirmation that announced <paramref name="overridesEntered"/> overrides; a line
+    /// that stops is ended instead. Nothing is deleted when that number changed (false). Nothing to delete is not an error.
+    /// </summary>
+    public Task<bool> DeleteLineAsync(Guid lineId, int overridesEntered, CancellationToken cancellationToken = default) =>
+        DeleteAsAnnouncedAsync(
+            () => context.RecurringOverrides.CountAsync(lineOverride => lineOverride.LineId == lineId, cancellationToken),
+            overridesEntered,
+            () => context.RecurringLines.Where(line => line.Id == lineId).ExecuteDeleteAsync(cancellationToken),
+            cancellationToken);
 
     /// <summary>Saves the actual total of a budget for a month, replacing the one entered before.</summary>
     public Task SetBudgetActualAsync(BudgetActual actual, CancellationToken cancellationToken = default)
@@ -167,6 +195,26 @@ public sealed class FinancePlanWriter(FinanceDbContext context)
                 ?? throw new InvalidOperationException("A row was inserted by another save, then deleted.", error);
             await ReplaceAsync(inserted, newRow, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Counts what a delete takes with it, then deletes, in one serializable transaction: the count locks the rows it read
+    /// and the range around them, so that an actual or override entered meanwhile waits for the delete (then fails on
+    /// its foreign key) and never goes unannounced with it. Nothing deleted when the count is not the one announced.
+    /// </summary>
+    private async Task<bool> DeleteAsAnnouncedAsync(
+        Func<Task<int>> count, int announced, Func<Task<int>> delete, CancellationToken cancellationToken)
+    {
+        await using var transaction = await context.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        if (await count() != announced)
+        {
+            // Disposed without a commit: rolled back, the locks released.
+            return false;
+        }
+
+        await delete();
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     /// <summary>

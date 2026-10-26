@@ -176,7 +176,7 @@ public class LineInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetime
         Assert.All([created, renamed], result =>
         {
             Assert.True((bool?)result["isError"]);
-            Assert.Contains("Another recurring line already has this name.", Text(result));
+            Assert.Contains("Another recurring line already has this name over the same period.", Text(result));
         });
         Assert.Equal(before, await WrittenRows.SnapshotAsync(mcp));
     }
@@ -187,7 +187,7 @@ public class LineInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetime
         { """{ "name": "LONG" }""", "Invalid recurring line" },
         { """{ "name": "Test line a\nb" }""", "Invalid recurring line" },
         // The name of a line of the demo, in another case.
-        { """{ "name": "DEMO" }""", "Another recurring line already has this name." },
+        { """{ "name": "DEMO" }""", "Another recurring line already has this name over the same period." },
         { """{ "amount": 0 }""", "Invalid recurring line" },
         { """{ "amount": 12.345 }""", "Invalid recurring line" },
         { """{ "amount": 1000000000 }""", "Invalid recurring line" },
@@ -243,7 +243,7 @@ public class LineInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetime
     public static TheoryData<string, string, string> InvalidCalls => new()
     {
         { "update_line", """{ "lineId": "00000000-0000-0000-0000-000000000099" }""", "No recurring line with this identifier in the plan." },
-        { "update_line", """{ "lineId": "MINE", "name": "DEMO" }""", "Another recurring line already has this name." },
+        { "update_line", """{ "lineId": "MINE", "name": "DEMO" }""", "Another recurring line already has this name over the same period." },
         { "update_line", """{ "lineId": "MINE", "dayOfMonth": 0 }""", "Invalid recurring line" },
         { "end_line", """{ "lineId": "MINE", "endDate": "2030-12-31" }""", "Invalid end date: never before the start date of the line." },
         { "end_line", """{ "lineId": "00000000-0000-0000-0000-000000000099", "endDate": "2031-12-31" }""", "No recurring line with this identifier in the plan." },

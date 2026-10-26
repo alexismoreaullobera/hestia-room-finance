@@ -50,7 +50,7 @@ public class FinancePlanWriterBudgetsTests(SqlServerFixture sqlServer)
     public async Task UpdateBudget_DeletedMeanwhile_Fails_WithoutCreatingItAgain()
     {
         var options = await SeedAsync();
-        await WriteAsync(options, w => w.DeleteBudgetAsync(_outings.Id, Token));
+        await WriteAsync(options, w => w.DeleteBudgetAsync(_outings.Id, 0, Token));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             WriteAsync(options, w => w.UpdateBudgetAsync(new Budget(_outings.Id, "Sorties", 150m), Token)));
@@ -66,8 +66,9 @@ public class FinancePlanWriterBudgetsTests(SqlServerFixture sqlServer)
         await WriteAsync(options, w => w.SetBudgetActualAsync(new BudgetActual(_groceries.Id, May, 280m), Token));
         await WriteAsync(options, w => w.SetBudgetActualAsync(new BudgetActual(_outings.Id, April, 96.50m), Token));
 
-        await WriteAsync(options, w => w.DeleteBudgetAsync(_groceries.Id, Token));
-        await WriteAsync(options, w => w.DeleteBudgetAsync(_groceries.Id, Token));
+        await WriteAsync(options, w => w.DeleteBudgetAsync(_groceries.Id, 2, Token));
+        // Deleted: nothing left to count, nor to delete.
+        await WriteAsync(options, w => w.DeleteBudgetAsync(_groceries.Id, 0, Token));
 
         var april = await LoadAsync(options, April);
         Assert.Equal(["Sorties"], april.Budgets.Select(b => b.Name));

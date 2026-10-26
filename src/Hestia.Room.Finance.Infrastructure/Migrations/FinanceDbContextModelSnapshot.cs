@@ -143,7 +143,8 @@ namespace Hestia.Room.Finance.Infrastructure.Migrations
 
                     b.HasIndex("Name")
                         .IsUnique()
-                        .HasDatabaseName("IX_RecurringLines_Name");
+                        .HasDatabaseName("IX_RecurringLines_Name")
+                        .HasFilter("[EndDate] IS NULL");
 
                     b.ToTable("RecurringLines", "finance", t =>
                         {

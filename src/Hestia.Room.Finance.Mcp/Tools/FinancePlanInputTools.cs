@@ -18,9 +18,6 @@ namespace Hestia.Room.Finance.Mcp.Tools;
 [McpServerToolType]
 public sealed class FinancePlanInputTools
 {
-    /// <summary>A budget has no dates: it is in the plan or not, whatever the month (also for set_budget_actual).</summary>
-    internal const string UnknownBudget = "No budget with this identifier in the plan.";
-
     private const string MonthShown = "Month the view shows, as YYYY-MM: the plan returned is the one of that month.";
 
     [McpServerTool(Name = "create_budget", Title = "Saisie : nouveau budget", ReadOnly = false,
@@ -38,7 +35,7 @@ public sealed class FinancePlanInputTools
         [Description(BudgetNameDescription)] string name,
         [Description(PlannedAmountDescription)] decimal plannedAmount,
         CancellationToken cancellationToken = default) =>
-        DecideSaveAndReadAsync(reader, month, Budgets, BudgetRule, plan =>
+        DecideSaveAndReadAsync(reader, month, ToolErrors.BudgetNameTaken, BudgetRule, plan =>
         {
             var budget = plan.Budgets.Create(Guid.CreateVersion7(), name, plannedAmount);
             return () => writer.AddBudgetAsync(budget, cancellationToken);
@@ -59,7 +56,7 @@ public sealed class FinancePlanInputTools
         [Description(BudgetNameDescription)] string name,
         [Description(PlannedAmountDescription)] decimal plannedAmount,
         CancellationToken cancellationToken = default) =>
-        DecideSaveAndReadAsync(reader, month, Budgets, BudgetRule, plan =>
+        DecideSaveAndReadAsync(reader, month, ToolErrors.BudgetNameTaken, BudgetRule, plan =>
         {
             var budget = plan.Budgets.Update(budgetId, name, plannedAmount);
             return () => writer.UpdateBudgetAsync(budget, cancellationToken);
@@ -80,18 +77,16 @@ public sealed class FinancePlanInputTools
         [Description("The number of actuals of this budget the user was told would go with it (its actualsEntered in "
             + "get_plan): the deletion is refused when it changed since.")] int actualsEntered,
         CancellationToken cancellationToken = default) =>
-        DecideSaveAndReadAsync(reader, month, Budgets, BudgetRule, plan =>
+        DecideSaveAndReadAsync(reader, month, ToolErrors.BudgetNameTaken, BudgetRule, plan =>
         {
             plan.Budgets.EnsureExists(budgetId);
             return async () =>
             {
                 // Never more deleted than the confirmation said: an actual entered meanwhile (another view, another host)
                 // would go unseen with the budget.
-                var counts = await reader.CountActualsByBudgetAsync(cancellationToken);
-                if (counts.GetValueOrDefault(budgetId) != actualsEntered)
+                if (!await writer.DeleteBudgetAsync(budgetId, actualsEntered, cancellationToken))
                     throw new McpException("The actuals of this budget changed since the confirmation: nothing was deleted. "
                         + "Show the plan again before deleting.");
-                await writer.DeleteBudgetAsync(budgetId, cancellationToken);
             };
         }, cancellationToken);
 
@@ -99,7 +94,8 @@ public sealed class FinancePlanInputTools
         Destructive = false, Idempotent = false, OpenWorld = false, UseStructuredContent = true,
         OutputSchemaType = typeof(Outputs.PlanOutput))]
     [Description("Reserved for the plan view, where the user types it: not to be called from a conversation. Adds a "
-        + "recurring line to the plan (an income, a fixed expense or a subscription), under a name no other line uses. "
+        + "recurring line to the plan (an income, a fixed expense or a subscription), under a name no other line uses at "
+        + "the same time. "
         + "Then returns the plan, as get_plan does for the month given.")]
     [McpAppUi(Visibility = [McpUiToolVisibility.App])]
     public static Task<CallToolResult> CreateLine(
@@ -118,7 +114,7 @@ public sealed class FinancePlanInputTools
         [Description(IsSubscriptionDescription)] bool isSubscription,
         [Description(CommitmentEndDateDescription)] DateOnly? commitmentEndDate,
         CancellationToken cancellationToken = default) =>
-        DecideSaveAndReadAsync(reader, month, Lines, LineRule, plan =>
+        DecideSaveAndReadAsync(reader, month, ToolErrors.LineNameTaken, LineRule, plan =>
         {
             var line = plan.Lines.Create(NewLine(Guid.CreateVersion7(), kind, name, amount, frequency, dayOfMonth, anchorMonth,
                 startDate, endDate, category, isSubscription, commitmentEndDate));
@@ -150,7 +146,7 @@ public sealed class FinancePlanInputTools
         [Description(IsSubscriptionDescription)] bool isSubscription,
         [Description(CommitmentEndDateDescription)] DateOnly? commitmentEndDate,
         CancellationToken cancellationToken = default) =>
-        DecideSaveAndReadAsync(reader, month, Lines, LineRule, plan =>
+        DecideSaveAndReadAsync(reader, month, ToolErrors.LineNameTaken, LineRule, plan =>
         {
             var line = plan.Lines.Update(NewLine(lineId, kind, name, amount, frequency, dayOfMonth, anchorMonth,
                 startDate, endDate, category, isSubscription, commitmentEndDate));
@@ -162,7 +158,8 @@ public sealed class FinancePlanInputTools
         OutputSchemaType = typeof(Outputs.PlanOutput))]
     [Description("Reserved for the plan view, where the user chooses the date: not to be called from a conversation. Ends a "
         + "recurring line that stops (a subscription cancelled, a rent after a move): it runs until that date, then leaves "
-        + "the months after; its past stays. Then returns the plan, as get_plan does for the month given.")]
+        + "the months after; its past stays; never so late that it meets a line of the same name. Then returns the plan, "
+        + "as get_plan does for the month given.")]
     [McpAppUi(Visibility = [McpUiToolVisibility.App])]
     public static Task<CallToolResult> EndLine(
         FinancePlanWriter writer,
@@ -171,10 +168,11 @@ public sealed class FinancePlanInputTools
         [Description("Identifier of a recurring line of the plan.")] Guid lineId,
         [Description("Last day the line runs, as YYYY-MM-DD, never before its start date.")] DateOnly endDate,
         CancellationToken cancellationToken = default) =>
-        DecideSaveAndReadAsync(reader, month, Lines, EndRule, plan =>
+        DecideSaveAndReadAsync(reader, month, ToolErrors.LineNameTaken, EndRule, plan =>
         {
-            var line = plan.Lines.End(lineId, endDate);
-            return () => writer.UpdateLineAsync(line, cancellationToken);
+            // Checked by the domain on the whole line, written as its end date only.
+            plan.Lines.End(lineId, endDate);
+            return () => writer.EndLineAsync(lineId, endDate, cancellationToken);
         }, cancellationToken);
 
     [McpServerTool(Name = "delete_line", Title = "Saisie : suppression d'une ligne récurrente", ReadOnly = false,
@@ -192,17 +190,15 @@ public sealed class FinancePlanInputTools
         [Description("The number of corrections of this line the user was told would go with it (its overridesEntered in "
             + "get_plan): the deletion is refused when it changed since.")] int overridesEntered,
         CancellationToken cancellationToken = default) =>
-        DecideSaveAndReadAsync(reader, month, Lines, LineRule, plan =>
+        DecideSaveAndReadAsync(reader, month, ToolErrors.LineNameTaken, LineRule, plan =>
         {
             plan.Lines.EnsureExists(lineId);
             return async () =>
             {
                 // Never more deleted than the confirmation said, as for a budget.
-                var counts = await reader.CountOverridesByLineAsync(cancellationToken);
-                if (counts.GetValueOrDefault(lineId) != overridesEntered)
+                if (!await writer.DeleteLineAsync(lineId, overridesEntered, cancellationToken))
                     throw new McpException("The corrections of this line changed since the confirmation: nothing was deleted. "
                         + "Show the plan again before deleting.");
-                await writer.DeleteLineAsync(lineId, cancellationToken);
             };
         }, cancellationToken);
 
@@ -222,24 +218,19 @@ public sealed class FinancePlanInputTools
             isSubscription ? new SubscriptionInfo(commitmentEndDate) : null);
     }
 
-    /// <summary>What a tool of the plan changes, for its messages.</summary>
-    private sealed record PlanItem(string Name);
-
-    private static readonly PlanItem Budgets = new("budget");
-    private static readonly PlanItem Lines = new("recurring line");
-
     /// <summary>
-    /// The skeleton of the tools of the plan: the whole plan read (every budget, every line, ended ones included), the
+    /// The skeleton of the tools of the plan: the whole plan read (every budget, every line, ended and future ones), the
     /// domain deciding what to save, then the save, then the plan of the month shown read back through the path of
     /// get_plan. Nothing is written when the domain refuses; a name the database refuses (taken meanwhile) becomes the
     /// same tool error as one the domain refuses.
     /// </summary>
+    /// <param name="nameTaken">The error of a name taken, by the domain or by the database.</param>
     /// <param name="valueRule">What a value of this tool must be, for the error of a value refused by the domain.</param>
     /// <param name="decide">The rules of the plan applied, giving the save to run.</param>
     private static async Task<CallToolResult> DecideSaveAndReadAsync(
         FinancePlanReader reader,
         string month,
-        PlanItem item,
+        string nameTaken,
         string valueRule,
         Func<FinancePlan, Func<Task>> decide,
         CancellationToken cancellationToken)
@@ -254,7 +245,7 @@ public sealed class FinancePlanInputTools
         }
         catch (ArgumentException error)
         {
-            throw Refused(error, item, valueRule);
+            throw Refused(error, nameTaken, valueRule);
         }
 
         try
@@ -264,7 +255,7 @@ public sealed class FinancePlanInputTools
         catch (NameTakenException error)
         {
             // Only this one: any other failure of the save is a server error, never a message about the input.
-            throw Refused(error, item, valueRule);
+            throw Refused(error, nameTaken, valueRule);
         }
 
         return await FinanceDataTools.PlanAsync(reader, yearMonth, cancellationToken);
@@ -275,11 +266,11 @@ public sealed class FinancePlanInputTools
     /// domain exception, never by a parameter name; never the value sent (the domain message and its details stay in the
     /// inner exception, for the server logs).
     /// </summary>
-    private static McpException Refused(ArgumentException error, PlanItem item, string valueRule) => new(error switch
+    private static McpException Refused(ArgumentException error, string nameTaken, string valueRule) => new(error switch
     {
-        UnknownBudgetException => UnknownBudget,
-        UnknownLineException => "No recurring line with this identifier in the plan.",
-        NameTakenException => $"Another {item.Name} already has this name.",
+        UnknownBudgetException => ToolErrors.UnknownBudget,
+        UnknownLineException => ToolErrors.UnknownLine,
+        NameTakenException => nameTaken,
         _ => valueRule,
     }, error);
 
@@ -298,7 +289,7 @@ public sealed class FinancePlanInputTools
 
     private const string LineNameDescription =
         "Name of the line, such as Loyer: at most 100 characters, no line break nor invisible character; not the name of "
-        + "another recurring line, ended ones included.";
+        + "another recurring line running at the same time (a line ended in December leaves its name to one from January).";
 
     private const string AmountDescription =
         "Amount of one debit or credit, in euros with at most two decimals, more than 0 (the kind gives the direction).";

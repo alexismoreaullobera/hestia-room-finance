@@ -56,7 +56,7 @@ RecurringOverride
 - A recurring line is considered **paid as planned** unless an override says otherwise; a budget without actual is considered **spent as planned**.
 - The budgets of a month are the ones passed to the calculation: a budget no longer used is simply not passed (no "active" flag in the domain).
 - A budget or a recurring line is changed for every month, past ones included: no versioning. A line that stops is **ended** on a date (its past stays); a change from a given month on is an end plus a new line. Deleting is for a mistake, and takes the actuals or corrections entered with it.
-- **Names**: two budgets never share a name, nor two recurring lines (ended ones included), ignoring case; a budget and a line may share one. A correction of a month where its line no longer falls due (after a change) is kept and ignored.
+- **Names**: two budgets never share a name, ignoring case; two recurring lines share one only one after the other (a rent ended in December, another one from January), never at the same time; a budget and a line may share one. The plan view shows the lines running during the month shown and those starting after it. A correction of a month where its line no longer falls due (after a change) is kept and ignored.
 - **Not stored**: bank details (IBAN, account numbers), individual transactions.
 
 ## Calculation rules

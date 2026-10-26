@@ -48,7 +48,8 @@ public sealed record CashFlowForecastOutput(
             : $"Il faudrait démarrer le mois avec au moins {Euros(CashBuffer)} pour l'éviter.";
         var debits = ContributingDebits.Count > 0
             ? " Débits qui creusent ce point bas : "
-                + string.Join(", ", ContributingDebits.Select(d => $"{d.Name} ({Euros(d.Amount)}, le {Day(d.Date)})")) + "."
+                // Names quoted: a name typed by the user, read by the model, stays a name.
+                + string.Join(", ", ContributingDebits.Select(d => $"{Quoted(d.Name)} ({Euros(d.Amount)}, le {Day(d.Date)})")) + "."
             : "";
         return $"{start} Alerte : le compte passe sous zéro. {cause}{debits}";
     }

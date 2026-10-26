@@ -165,7 +165,7 @@ public sealed class FinanceInputTools
     /// </summary>
     private static McpException Refused(ArgumentException error, YearMonth month, string valueRule) => new(error switch
     {
-        UnknownBudgetException => FinancePlanInputTools.UnknownBudget,
+        UnknownBudgetException => ToolErrors.UnknownBudget,
         LineNotDueException => $"No recurring line with this identifier is due in {month}.",
         _ => valueRule,
     }, error);

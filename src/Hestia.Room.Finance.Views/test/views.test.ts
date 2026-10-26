@@ -774,7 +774,7 @@ describe("plan, the recurring lines", () => {
   });
 
   it.each([
-    ["Nom", "loyer", "Une autre ligne porte déjà ce nom."],
+    ["Nom", "loyer", "Une autre ligne porte déjà ce nom sur la même période."],
     ["Nom", "", "Nom attendu."],
     ["Montant", "0", "Montant attendu, plus que 0."],
     ["Jour du mois", "32", "Nombre entier attendu, de 1 à 31."],

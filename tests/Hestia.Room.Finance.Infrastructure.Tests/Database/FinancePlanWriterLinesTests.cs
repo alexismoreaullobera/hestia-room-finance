@@ -95,7 +95,7 @@ public class FinancePlanWriterLinesTests(SqlServerFixture sqlServer)
     public async Task UpdateLine_DeletedMeanwhile_Fails_WithoutCreatingItAgain()
     {
         var options = await SeedAsync();
-        await WriteAsync(options, w => w.DeleteLineAsync(_water.Id, Token));
+        await WriteAsync(options, w => w.DeleteLineAsync(_water.Id, 0, Token));
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => WriteAsync(options, w => w.UpdateLineAsync(_water, Token)));
 
@@ -110,8 +110,9 @@ public class FinancePlanWriterLinesTests(SqlServerFixture sqlServer)
         await WriteAsync(options, w => w.SetLineOverrideAsync(RecurringOverride.Skipped(_rent.Id, May), Token));
         await WriteAsync(options, w => w.SetLineOverrideAsync(RecurringOverride.WithAmount(_water.Id, April, 32m), Token));
 
-        await WriteAsync(options, w => w.DeleteLineAsync(_rent.Id, Token));
-        await WriteAsync(options, w => w.DeleteLineAsync(_rent.Id, Token));
+        await WriteAsync(options, w => w.DeleteLineAsync(_rent.Id, 2, Token));
+        // Deleted: nothing left to count, nor to delete.
+        await WriteAsync(options, w => w.DeleteLineAsync(_rent.Id, 0, Token));
 
         var april = await LoadAsync(options, April);
         Assert.Equal(["Eau"], april.Lines.Select(l => l.Name));

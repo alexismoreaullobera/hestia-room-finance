@@ -43,6 +43,19 @@ public sealed class FinancePlanReader(FinanceDbContext context)
         return new FinancePlan(budgets.Select(row => row.ToDomain()), lines.Select(row => row.ToDomain()));
     }
 
+    /// <summary>
+    /// The recurring lines of the plan from a month on: those running during the month, and those starting after it
+    /// (a line saved for later stays in sight). Not those ended before the month.
+    /// </summary>
+    public async Task<IReadOnlyList<RecurringLine>> LoadLinesFromAsync(YearMonth month, CancellationToken cancellationToken = default)
+    {
+        var firstDay = month.FirstDay;
+        var rows = await context.RecurringLines.AsNoTracking()
+            .Where(line => line.EndDate == null || line.EndDate >= firstDay)
+            .ToListAsync(cancellationToken);
+        return [.. rows.Select(row => row.ToDomain())];
+    }
+
     public async Task<FinanceMonth> LoadMonthAsync(YearMonth month, CancellationToken cancellationToken = default)
     {
         var firstDay = month.FirstDay;

@@ -8,28 +8,29 @@ namespace Hestia.Room.Finance.Mcp.Tools.Outputs;
 
 /// <summary>
 /// Structured output of <c>get_plan</c>: the plan itself, as it stands for a month: every budget, and the recurring lines
-/// that run during the month. Amounts in euros, rounded to the cent.
+/// that run during the month or start after it. Amounts in euros, rounded to the cent.
 /// </summary>
 public sealed record PlanOutput(
     [property: Description("Month, as YYYY-MM.")] string Month,
     [property: Description("The budgets of the plan (variable expenses planned every month), by name.")]
     IReadOnlyList<PlanBudgetOutput> Budgets,
-    [property: Description("The recurring lines running during the month (due this month or not), incomes first, then by "
-        + "day of the month and by name.")]
+    [property: Description("The recurring lines running during the month (due this month or not) or starting after it, "
+        + "incomes first, then by day of the month and by name.")]
     IReadOnlyList<PlanLineOutput> Lines)
 {
-    /// <param name="month">The month shown.</param>
+    /// <param name="month">The month shown: its budgets.</param>
+    /// <param name="lines">The lines of the plan from that month on (running during it, or starting after it).</param>
     /// <param name="actualsByBudget">For each budget with actuals, the number of months they were entered for.</param>
     /// <param name="overridesByLine">For each line with overrides, the number of months they were entered for.</param>
-    public static PlanOutput From(
-        FinanceMonth month, IReadOnlyDictionary<Guid, int> actualsByBudget, IReadOnlyDictionary<Guid, int> overridesByLine) => new(
+    public static PlanOutput From(FinanceMonth month, IEnumerable<RecurringLine> lines,
+        IReadOnlyDictionary<Guid, int> actualsByBudget, IReadOnlyDictionary<Guid, int> overridesByLine) => new(
         month.Month.ToString(),
         [.. month.Budgets
             .OrderBy(budget => budget.Name, NameOrder)
             .ThenBy(budget => budget.Id)
             .Select(budget => new PlanBudgetOutput(
                 budget.Id, budget.Name, Cents(budget.PlannedAmount), actualsByBudget.GetValueOrDefault(budget.Id)))],
-        [.. month.Lines
+        [.. lines
             .OrderByDescending(line => line.Kind == FlowKind.Income)
             .ThenBy(line => line.DayOfMonth)
             .ThenBy(line => line.Name, NameOrder)
@@ -41,8 +42,11 @@ public sealed record PlanOutput(
     {
         // Names quoted: a name typed by the user, read by the model, stays a name.
         var budgets = JoinOrNone(Budgets.Select(b => $"{Quoted(b.Name)} {Euros(b.PlannedAmount)} par mois"), "aucun");
-        var incomes = JoinOrNone(Lines.Where(l => l.Kind == FlowKind.Income).Select(l => l.Describe()), "aucune");
-        var expenses = JoinOrNone(Lines.Where(l => l.Kind == FlowKind.Expense).Select(l => l.Describe()), "aucune");
+        var lastDay = YearMonth.TryParse(Month, out var shown)
+            ? shown.LastDay
+            : throw new InvalidOperationException($"'{Month}' is not an output month (YYYY-MM).");
+        var incomes = JoinOrNone(Lines.Where(l => l.Kind == FlowKind.Income).Select(l => l.Describe(lastDay)), "aucune");
+        var expenses = JoinOrNone(Lines.Where(l => l.Kind == FlowKind.Expense).Select(l => l.Describe(lastDay)), "aucune");
         return $"Plan pour {MonthName(Month)}. Budgets : {budgets}. Entrées : {incomes}. Dépenses : {expenses}.";
     }
 
@@ -97,7 +101,9 @@ public sealed record PlanLineOutput(
         line.Subscription?.CommitmentEndDate,
         overridesEntered);
 
-    internal string Describe() =>
+    /// <param name="lastDayShown">The last day of the month shown: a line starting after it says when.</param>
+    internal string Describe(DateOnly lastDayShown) =>
         $"{Quoted(Name)} {Euros(Amount)} ({FrequencyName(Frequency)}, le {DayOfMonth}"
+        + (StartDate > lastDayShown ? $", à partir du {FullDate(StartDate)}" : "")
         + (EndDate is { } end ? $", jusqu'au {FullDate(end)})" : ")");
 }

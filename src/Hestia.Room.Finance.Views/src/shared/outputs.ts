@@ -119,7 +119,7 @@ export interface PlanOutput {
   month: string;
   /** By name. */
   budgets: PlanBudgetOutput[];
-  /** The lines running during the month: incomes first, then by day and by name. */
+  /** The lines running during the month or starting after it: incomes first, then by day and by name. */
   lines: PlanLineOutput[];
 }
 
