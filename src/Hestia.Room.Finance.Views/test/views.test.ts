@@ -11,17 +11,17 @@ import forecastFixture from "./fixtures/cash-flow-forecast.json";
 import monthFixture from "./fixtures/month-overview.json";
 import subscriptionsFixture from "./fixtures/subscriptions.json";
 import planFixture from "./fixtures/plan.json";
-import { CREATE_BUDGET, DELETE_BUDGET, plan, UPDATE_BUDGET } from "../src/plan";
+import { CREATE_BUDGET, CREATE_LINE, DELETE_BUDGET, DELETE_LINE, END_LINE, plan, REFUSALS, UPDATE_BUDGET, UPDATE_LINE } from "../src/plan";
 import { startView } from "../src/shared/view";
 import { asHostApp, at, fakeApp, ManualResizeObserver, pageSkeleton, plain, toolResult } from "./helpers";
 
 // The fixtures are the structured content of the view tools on the demo plan, written and checked by a C# test.
-// Typed by annotation, not by assertion: the compiler checks that they match the interfaces. The month and the
-// subscriptions need an assertion, since JSON gives their enums as plain strings, not as the union types.
+// Typed by annotation, not by assertion: the compiler checks that they match the interfaces. The month, the
+// subscriptions and the plan need an assertion, since JSON gives their enums as plain strings, not as the union types.
 const demoMonth = monthFixture as MonthSummaryOutput;
 const demoForecast: CashFlowForecastOutput = forecastFixture;
 const demoSubscriptions = subscriptionsFixture as SubscriptionsOutput;
-const demoPlan: PlanOutput = planFixture;
+const demoPlan = planFixture as PlanOutput;
 
 let content: HTMLElement;
 beforeEach(() => {
@@ -550,6 +550,7 @@ describe("plan", () => {
     expect(rows(".budgets")).toEqual(demoPlan.budgets.map(b => [[b.name], [euros(b.plannedAmount)], ["Modifier", "Supprimer"]]));
     expect(buttonIn(newRow(), "Nouveau budget")).toBeDefined();
     expect(content.querySelector(".note")?.textContent).toContain("change aussi les mois passés");
+    expect(content.querySelector(".note")?.textContent).toContain("Terminer une ligne garde son passé");
   });
 
   it("keeps the row to add a budget when the plan has none", () => {
@@ -659,6 +660,334 @@ describe("plan", () => {
     buttonIn(rowOf(2), "Confirmer la suppression").click();
 
     expect(call).toHaveBeenCalledExactlyOnceWith(DELETE_BUDGET, { month: "2027-03", budgetId: outings.id, actualsEntered: outings.actualsEntered });
+  });
+});
+
+describe("plan, the recurring lines", () => {
+  const lineRow = (index: number) => content.querySelectorAll(".lines tbody tr")[index]!;
+  const newLine = () => content.querySelector(".lines tfoot tr")!;
+  const buttonIn = (node: Element, name: string) => [...node.querySelectorAll("button")].find(b => b.textContent === name)!;
+  const control = (node: Element, label: string) => node.querySelector<HTMLInputElement & HTMLSelectElement>(`[aria-label="${label}"]`)!;
+  const holder = (node: Element, label: string) => control(node, label).closest("label")!;
+  const submitIn = (node: Element) => { node.querySelector("form")!.dispatchEvent(new Event("submit", { cancelable: true })); };
+  const choose = (node: Element, label: string, value: string) => {
+    control(node, label).value = value;
+    control(node, label).dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const lines = demoPlan.lines;
+  const named = (name: string) => lines.find(line => line.name === name)!;
+  const indexOf = (name: string) => lines.findIndex(line => line.name === name);
+
+  function render(call = vi.fn<ViewContext["call"]>(() => new Promise(() => {}))) {
+    content.replaceChildren();
+    plan.render(demoPlan, content, at(640, call));
+    return call;
+  }
+
+  it("shows each line with its day, its details, its frequency and its amount, then the row to add one", () => {
+    render();
+
+    expect(content.querySelector(".lines")?.previousElementSibling?.textContent).toBe("Lignes récurrentes");
+    expect(rows(".lines")[0]).toEqual([["28"], ["Salaire", "entrée"], ["mensuel"], [euros(2250)], ["Modifier", "Terminer", "Supprimer"]]);
+    expect(rows(".lines")[indexOf("Salle de sport")]?.[1]).toEqual(["Salle de sport", "abonnement", "engagement jusqu'au 31/05/2027"]);
+    expect(rows(".lines")[indexOf("Assurance habitation")]?.[1]).toEqual(["Assurance habitation", "en novembre"]);
+    expect(rows(".lines")[indexOf("Assurance auto")]?.slice(1, 3)).toEqual([["Assurance auto", "en mars, juin, septembre, décembre"], ["trimestriel"]]);
+    expect(rows(".lines")[indexOf("Loyer")]?.[1]).toEqual(["Loyer"]);
+    expect(buttonIn(newLine(), "Nouvelle ligne")).toBeDefined();
+  });
+
+  it("gives the months of a quarterly line across the end of the year, in the order of the year", () => {
+    content.replaceChildren();
+    const quarterly = { ...named("Assurance auto"), anchorMonth: 11 };
+    plan.render({ ...demoPlan, lines: [quarterly] }, content, at(640, vi.fn<ViewContext["call"]>(() => new Promise(() => {}))));
+
+    expect(rows(".lines")[0]?.[1]).toEqual(["Assurance auto", "en février, mai, août, novembre"]);
+  });
+
+  it.each([["Salaire"], ["Salle de sport"], ["Assurance habitation"], ["ended"]])(
+    "sends the line %s back unchanged when nothing is touched", (name) => {
+      const line = name === "ended" ? { ...named("Loyer"), endDate: "2027-06-30" } : named(name);
+      const call = vi.fn<ViewContext["call"]>(() => new Promise(() => {}));
+      content.replaceChildren();
+      plan.render({ ...demoPlan, lines: [line] }, content, at(640, call));
+      buttonIn(lineRow(0), "Modifier").click();
+
+      submitIn(lineRow(0));
+
+      expect(call).toHaveBeenCalledExactlyOnceWith(UPDATE_LINE, {
+        month: "2027-03", lineId: line.id, kind: line.kind, name: line.name, amount: line.amount, category: line.category,
+        frequency: line.frequency, dayOfMonth: line.dayOfMonth, anchorMonth: line.anchorMonth, startDate: line.startDate,
+        endDate: line.endDate, isSubscription: line.isSubscription, commitmentEndDate: line.commitmentEndDate,
+      });
+    });
+
+  it("says when a line ends, and when a line saved for later starts", () => {
+    content.replaceChildren();
+    const ended = { ...named("Loyer"), endDate: "2027-06-30" };
+    const later = { ...named("Box internet"), isSubscription: false, startDate: "2027-05-01" };
+    plan.render({ ...demoPlan, lines: [ended, later] }, content, at(640, vi.fn<ViewContext["call"]>(() => new Promise(() => {}))));
+
+    expect(rows(".lines")[0]?.[1]).toEqual(["Loyer", "jusqu'au 30/06/2027"]);
+    expect(rows(".lines")[1]?.[1]).toEqual(["Box internet", "à partir du 01/05/2027"]);
+  });
+
+  it("changes a line: every field prefilled, sent with its identifier, the month of a list as a number", () => {
+    const call = render();
+    const row = () => lineRow(indexOf("Assurance auto"));
+    buttonIn(row(), "Modifier").click();
+    expect([control(row(), "Type").value, control(row(), "Nom").value, control(row(), "Catégorie").value, control(row(), "Fréquence").value,
+      control(row(), "Jour du mois").value, control(row(), "Mois de la première échéance").value, control(row(), "Début").value])
+      .toEqual(["Expense", "Assurance auto", "Insurance", "Quarterly", "15", "3", "2026-03-01"]);
+    control(row(), "Montant").value = "170";
+
+    submitIn(row());
+
+    expect(call).toHaveBeenCalledExactlyOnceWith(UPDATE_LINE, {
+      month: "2027-03", lineId: named("Assurance auto").id, kind: "Expense", name: "Assurance auto", amount: 170, category: "Insurance",
+      frequency: "Quarterly", dayOfMonth: 15, anchorMonth: 3, startDate: "2026-03-01", endDate: null, isSubscription: false, commitmentEndDate: null,
+    });
+  });
+
+  it("adds a line from its defaults: an expense starting the month shown, no month nor commitment asked", () => {
+    const call = render();
+    buttonIn(newLine(), "Nouvelle ligne").click();
+    expect(control(newLine(), "Début").value).toBe("2027-03-01");
+    expect(holder(newLine(), "Mois de la première échéance").hidden).toBe(true);
+    expect(holder(newLine(), "Fin d'engagement (facultative)").hidden).toBe(true);
+    control(newLine(), "Nom").value = "Cadeaux";
+    control(newLine(), "Montant").value = "40";
+    control(newLine(), "Jour du mois").value = "10";
+
+    submitIn(newLine());
+
+    expect(call).toHaveBeenCalledExactlyOnceWith(CREATE_LINE, {
+      month: "2027-03", kind: "Expense", name: "Cadeaux", amount: 40, category: "Other", frequency: "Monthly", dayOfMonth: 10,
+      anchorMonth: null, startDate: "2027-03-01", endDate: null, isSubscription: false, commitmentEndDate: null,
+    });
+  });
+
+  it("adds a yearly income: its month asked and sent, never a subscription", () => {
+    const call = render();
+    buttonIn(newLine(), "Nouvelle ligne").click();
+    choose(newLine(), "Type", "Income");
+    choose(newLine(), "Fréquence", "Yearly");
+    choose(newLine(), "Mois de la première échéance", "6");
+    control(newLine(), "Nom").value = "Prime";
+    control(newLine(), "Montant").value = "800";
+    control(newLine(), "Jour du mois").value = "30";
+
+    submitIn(newLine());
+
+    expect(holder(newLine(), "Abonnement").hidden).toBe(true);
+    expect(call).toHaveBeenCalledExactlyOnceWith(CREATE_LINE,
+      expect.objectContaining({ kind: "Income", frequency: "Yearly", anchorMonth: 6, isSubscription: false, commitmentEndDate: null }));
+  });
+
+  it("adds a subscription with its end of commitment, asked once Abonnement is checked", () => {
+    const call = render();
+    buttonIn(newLine(), "Nouvelle ligne").click();
+    control(newLine(), "Abonnement").checked = true;
+    control(newLine(), "Abonnement").dispatchEvent(new Event("change", { bubbles: true }));
+    expect(holder(newLine(), "Fin d'engagement (facultative)").hidden).toBe(false);
+    control(newLine(), "Fin d'engagement (facultative)").value = "2027-12-31";
+    control(newLine(), "Nom").value = "Musique";
+    control(newLine(), "Montant").value = "10,99";
+    control(newLine(), "Jour du mois").value = "12";
+
+    submitIn(newLine());
+
+    expect(call).toHaveBeenCalledExactlyOnceWith(CREATE_LINE,
+      expect.objectContaining({ name: "Musique", amount: 10.99, isSubscription: true, commitmentEndDate: "2027-12-31" }));
+  });
+
+  it.each([
+    ["Nom", "loyer", "Une autre ligne porte déjà ce nom sur la même période."],
+    ["Nom", "", "Nom attendu."],
+    ["Montant", "0", "Montant attendu, plus que 0."],
+    ["Jour du mois", "32", "Nombre entier attendu, de 1 à 31."],
+    ["Fin (facultative)", "2027-02-28", "La fin ne peut pas précéder le début."],
+  ])("refuses the field %s at %j before any call", (label, value, message) => {
+    const call = render();
+    buttonIn(newLine(), "Nouvelle ligne").click();
+    control(newLine(), "Nom").value = "Cadeaux";
+    control(newLine(), "Montant").value = "40";
+    control(newLine(), "Jour du mois").value = "10";
+    control(newLine(), label).value = value;
+
+    submitIn(newLine());
+
+    expect(call).not.toHaveBeenCalled();
+    expect(newLine().querySelector(".field-error")?.textContent).toBe(message);
+  });
+
+  it("drops the subscription and its commitment when the line becomes an income", () => {
+    const call = render();
+    buttonIn(newLine(), "Nouvelle ligne").click();
+    control(newLine(), "Abonnement").checked = true;
+    control(newLine(), "Abonnement").dispatchEvent(new Event("change", { bubbles: true }));
+    control(newLine(), "Fin d'engagement (facultative)").value = "2027-12-31";
+    choose(newLine(), "Type", "Income");
+    control(newLine(), "Nom").value = "Prime";
+    control(newLine(), "Montant").value = "800";
+    control(newLine(), "Jour du mois").value = "30";
+
+    submitIn(newLine());
+
+    expect(holder(newLine(), "Fin d'engagement (facultative)").hidden).toBe(true);
+    expect(call).toHaveBeenCalledExactlyOnceWith(CREATE_LINE,
+      expect.objectContaining({ kind: "Income", isSubscription: false, commitmentEndDate: null }));
+  });
+
+  it.each([
+    ["an end on its start", "2027-03-01"],
+    ["no end", ""],
+  ])("accepts %s", (_, end) => {
+    const call = render();
+    buttonIn(newLine(), "Nouvelle ligne").click();
+    control(newLine(), "Nom").value = "Cadeaux";
+    control(newLine(), "Montant").value = "40";
+    control(newLine(), "Jour du mois").value = "10";
+    control(newLine(), "Fin (facultative)").value = end;
+
+    submitIn(newLine());
+
+    expect(call).toHaveBeenCalledOnce();
+  });
+
+  it("accepts the name of a line once the other one has ended, refuses it while both run", () => {
+    content.replaceChildren();
+    const call = vi.fn<ViewContext["call"]>(() => new Promise(() => {}));
+    plan.render({ ...demoPlan, lines: [{ ...named("Loyer"), endDate: "2027-03-31" }] }, content, at(640, call));
+    buttonIn(newLine(), "Nouvelle ligne").click();
+    control(newLine(), "Nom").value = "Loyer";
+    control(newLine(), "Montant").value = "750";
+    control(newLine(), "Jour du mois").value = "5";
+
+    // The default start, 2027-03-01: both run in March.
+    submitIn(newLine());
+    expect(newLine().querySelector(".field-error")?.textContent).toBe("Une autre ligne porte déjà ce nom sur la même période.");
+    expect(document.activeElement).toBe(control(newLine(), "Nom"));
+
+    control(newLine(), "Début").value = "2027-04-01";
+    submitIn(newLine());
+
+    expect(call).toHaveBeenCalledExactlyOnceWith(CREATE_LINE, expect.objectContaining({ name: "Loyer", startDate: "2027-04-01" }));
+  });
+
+  it("accepts the name of a budget: two lists apart", () => {
+    const call = render();
+    buttonIn(newLine(), "Nouvelle ligne").click();
+    control(newLine(), "Nom").value = demoPlan.budgets[0]!.name;
+    control(newLine(), "Montant").value = "40";
+    control(newLine(), "Jour du mois").value = "10";
+
+    submitIn(newLine());
+
+    expect(call).toHaveBeenCalledOnce();
+  });
+
+  it("ends a line on the day chosen, prefilled with the last day of the month shown", () => {
+    const call = render();
+    const row = () => lineRow(indexOf("Loyer"));
+    buttonIn(row(), "Terminer").click();
+    expect(control(row(), "Dernier jour").value).toBe("2027-03-31");
+    control(row(), "Dernier jour").value = "2027-04-30";
+
+    submitIn(row());
+
+    expect(call).toHaveBeenCalledExactlyOnceWith(END_LINE, { month: "2027-03", lineId: named("Loyer").id, endDate: "2027-04-30" });
+  });
+
+  it.each([["2027-04", "2027-04-30"], ["2028-02", "2028-02-29"]])("proposes the last day of %s to end a line", (month, day) => {
+    content.replaceChildren();
+    plan.render({ ...demoPlan, month }, content, at(640, vi.fn<ViewContext["call"]>(() => new Promise(() => {}))));
+
+    buttonIn(lineRow(indexOf("Loyer")), "Terminer").click();
+
+    expect(control(lineRow(indexOf("Loyer")), "Dernier jour").value).toBe(day);
+  });
+
+  it("proposes its own end to end an ended line again, never a later day", () => {
+    content.replaceChildren();
+    plan.render({ ...demoPlan, lines: [{ ...named("Loyer"), endDate: "2027-03-15" }] },
+      content, at(640, vi.fn<ViewContext["call"]>(() => new Promise(() => {}))));
+
+    buttonIn(lineRow(0), "Terminer").click();
+
+    expect(control(lineRow(0), "Dernier jour").value).toBe("2027-03-15");
+  });
+
+  it("ends a line on its start, and refuses to end it so late that it meets the next line of the same name", () => {
+    content.replaceChildren();
+    const call = vi.fn<ViewContext["call"]>(() => new Promise(() => {}));
+    const next = { ...named("Loyer"), id: "00000000-0000-0000-0000-000000000099", startDate: "2027-07-01" };
+    plan.render({ ...demoPlan, lines: [{ ...named("Loyer"), endDate: "2027-06-30" }, next] }, content, at(640, call));
+    const row = () => lineRow(0);
+
+    buttonIn(row(), "Terminer").click();
+    control(row(), "Dernier jour").value = "2027-07-01";
+    submitIn(row());
+    expect(row().querySelector(".field-error")?.textContent).toBe("Une autre ligne porte déjà ce nom sur la même période.");
+
+    control(row(), "Dernier jour").value = "2026-03-01";
+    submitIn(row());
+    expect(call).toHaveBeenCalledExactlyOnceWith(END_LINE, { month: "2027-03", lineId: named("Loyer").id, endDate: "2026-03-01" });
+  });
+
+  it("refuses an end before the start of the line", () => {
+    const call = render();
+    const row = () => lineRow(indexOf("Loyer"));
+    buttonIn(row(), "Terminer").click();
+    control(row(), "Dernier jour").value = "2026-02-28";
+
+    submitIn(row());
+
+    expect(call).not.toHaveBeenCalled();
+    expect(row().querySelector(".field-error")?.textContent).toBe("La fin ne peut pas précéder le début de la ligne.");
+  });
+
+  it("says what goes with a line deleted, and sends the number of corrections announced", () => {
+    const call = render();
+    const row = () => lineRow(indexOf("Électricité"));
+    buttonIn(row(), "Supprimer").click();
+    expect(row().querySelector(".confirmation")?.textContent).toBe("Supprimer « Électricité » ? Sa correction saisie sera aussi supprimée.");
+
+    buttonIn(row(), "Confirmer la suppression").click();
+
+    expect(call).toHaveBeenCalledExactlyOnceWith(DELETE_LINE, { month: "2027-03", lineId: named("Électricité").id, overridesEntered: 1 });
+  });
+
+  it("deletes a line without corrections, sending 0", () => {
+    const call = render();
+    const row = () => lineRow(indexOf("Loyer"));
+    buttonIn(row(), "Supprimer").click();
+
+    buttonIn(row(), "Confirmer la suppression").click();
+
+    expect(call).toHaveBeenCalledExactlyOnceWith(DELETE_LINE, { month: "2027-03", lineId: named("Loyer").id, overridesEntered: 0 });
+  });
+
+  it("says nothing more for a line without corrections, and the plural for several", () => {
+    content.replaceChildren();
+    const loyer = { ...named("Loyer"), overridesEntered: 3 };
+    plan.render({ ...demoPlan, lines: [named("Salaire"), loyer] }, content, at(640, vi.fn<ViewContext["call"]>(() => new Promise(() => {}))));
+
+    buttonIn(lineRow(0), "Supprimer").click();
+    buttonIn(lineRow(1), "Supprimer").click();
+
+    expect(lineRow(0).querySelector(".confirmation")?.textContent).toBe("Supprimer « Salaire » ?");
+    expect(lineRow(1).querySelector(".confirmation")?.textContent).toBe("Supprimer « Loyer » ? Ses 3 corrections saisies seront aussi supprimées.");
+  });
+});
+
+describe("plan, the refusals of the server", () => {
+  it.each(REFUSALS.map(([server, view]) => [server, view]))("explains %j", (server, view) => {
+    // As the SDK writes a tool error: the message after a prefix of its own.
+    expect(plan.explain?.(`An error occurred invoking 'create_line': ${server}`)).toBe(view);
+  });
+
+  it("leaves any other refusal to the general message", () => {
+    expect(plan.explain?.("Invalid recurring line: expected a name of at most 100 characters.")).toBeNull();
   });
 });
 

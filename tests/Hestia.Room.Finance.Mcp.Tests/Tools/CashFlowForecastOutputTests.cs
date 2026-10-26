@@ -50,7 +50,8 @@ public class CashFlowForecastOutputTests
         Assert.Contains($"point bas {(-550m).ToString("C", French)} le 05/04", text);
         Assert.Contains("Alerte", text);
         Assert.Contains($"au moins {650m.ToString("C", French)}", text);
-        Assert.Contains($"Loyer ({650m.ToString("C", French)}, le 05/04)", text);
+        // The name quoted: typed by the user, read by the model.
+        Assert.Contains($"« Loyer » ({650m.ToString("C", French)}, le 05/04)", text);
     }
 
     [Fact]

@@ -301,12 +301,40 @@ describe("startView", () => {
       await startView(view, asHostApp(app));
       app.sendResult(result("2026-10"));
 
-      expect(await lastCall()("set_test", {})).toBe(false);
+      // The message given back too, for the form to show it where the user looks.
+      expect(await lastCall()("set_test", {})).toBe("Valeur refusée : vérifiez la saisie.");
 
       expect(byId("status").textContent).toBe("Valeur refusée : vérifiez la saisie.");
       expect(byId("status").classList.contains("error")).toBe(true);
       expect(render).toHaveBeenCalledOnce();
       expect(button("next").disabled).toBe(false);
+    });
+
+    it("says a refusal as the view explains it, from the text of the tool error", async () => {
+      const app = fakeApp();
+      app.callServerTool.mockResolvedValue(toolResult({ isError: true, content: [{ type: "text", text: "Error: name taken." }] }));
+      view = { ...view, explain: refusal => (refusal.includes("name taken") ? "Nom déjà pris." : null) };
+      await startView(view, asHostApp(app));
+      app.sendResult(result("2026-10"));
+
+      expect(await lastCall()("set_test", {})).toBe("Nom déjà pris.");
+
+      expect(byId("status").textContent).toBe("Nom déjà pris.");
+      expect(byId("status").classList.contains("error")).toBe(true);
+    });
+
+    it("keeps the general message for a refusal the view does not explain, and for a navigation", async () => {
+      const app = fakeApp();
+      app.callServerTool.mockResolvedValue(toolResult({ isError: true, content: [{ type: "text", text: "Error: something else." }] }));
+      view = { ...view, explain: refusal => (refusal.includes("name taken") ? "Nom déjà pris." : null) };
+      await startView(view, asHostApp(app));
+      app.sendResult(result("2026-10"));
+
+      expect(await lastCall()("set_test", {})).toBe("Valeur refusée : vérifiez la saisie.");
+
+      app.callServerTool.mockResolvedValue(toolResult({ isError: true, content: [{ type: "text", text: "Error: name taken." }] }));
+      button("next").click();
+      await vi.waitFor(() => { expect(byId("status").textContent).toBe("Données indisponibles pour ce mois."); });
     });
 
     it("says the save failed when the call fails", async () => {
@@ -315,7 +343,7 @@ describe("startView", () => {
       await startView(view, asHostApp(app));
       app.sendResult(result("2026-10"));
 
-      expect(await lastCall()("set_test", {})).toBe(false);
+      expect(await lastCall()("set_test", {})).toBe("Enregistrement impossible, réessayez.");
 
       expect(byId("status").textContent).toBe("Enregistrement impossible, réessayez.");
       expect(button("next").disabled).toBe(false);

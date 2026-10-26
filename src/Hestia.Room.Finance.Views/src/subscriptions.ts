@@ -1,17 +1,9 @@
-import type { Category, Frequency, SubscriptionOutput, SubscriptionsOutput } from "./shared/outputs";
+import type { SubscriptionOutput, SubscriptionsOutput } from "./shared/outputs";
 import { amount, card, element } from "./shared/dom";
 import { formatDate, formatDay, formatEuros, translate } from "./shared/format";
+import { categories, frequencies } from "./shared/labels";
 import type { ViewDefinition } from "./shared/view";
 import "./subscriptions.css";
-
-// French names of the Frequency and Category enums: a Record over the union types, so a value added to outputs.ts
-// without a translation does not compile; a C# test checks that the unions of outputs.ts equal the domain enums.
-export const frequencies: Readonly<Record<Frequency, string>> = { Monthly: "mensuel", Quarterly: "trimestriel", Yearly: "annuel" };
-export const categories: Readonly<Record<Category, string>> = {
-  Other: "Autre", Income: "Revenu", Housing: "Logement", Utilities: "Énergie", Telecom: "Télécom",
-  Insurance: "Assurance", Transport: "Transport", Health: "Santé", Food: "Alimentation", Leisure: "Loisirs",
-  Education: "Éducation", Savings: "Épargne", Taxes: "Impôts",
-};
 
 function subscriptionRow(subscription: SubscriptionOutput): HTMLElement {
   return element("tr", {},

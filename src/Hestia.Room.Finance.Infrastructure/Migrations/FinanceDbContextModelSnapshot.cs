@@ -133,20 +133,28 @@ namespace Hestia.Room.Finance.Infrastructure.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("SQL_Latin1_General_CP1_CI_AS");
 
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
 
                     b.HasKey("Id");
 
+                    b.HasIndex("Name")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RecurringLines_Name")
+                        .HasFilter("[EndDate] IS NULL");
+
                     b.ToTable("RecurringLines", "finance", t =>
                         {
-                            t.HasCheckConstraint("CK_RecurringLines_Amount", "[Amount] > 0");
+                            t.HasCheckConstraint("CK_RecurringLines_Amount", "[Amount] > 0 AND [Amount] <= 999999999.99");
 
                             t.HasCheckConstraint("CK_RecurringLines_AnchorMonth", "[AnchorMonth] IS NULL OR [AnchorMonth] BETWEEN 1 AND 12");
 
                             t.HasCheckConstraint("CK_RecurringLines_DayOfMonth", "[DayOfMonth] BETWEEN 1 AND 31");
+
+                            t.HasCheckConstraint("CK_RecurringLines_EndDate", "[EndDate] IS NULL OR [EndDate] >= [StartDate]");
                         });
                 });
 

@@ -29,14 +29,15 @@ public partial class McpEndpointTests(McpServerFixture mcp)
     private static readonly string[] DataTools = ["get_month_summary", "get_cash_flow_forecast", "list_recurring_lines", "list_subscriptions", "get_plan"];
 
     private static readonly string[] InputTools =
-        ["set_starting_balance", "set_budget_actual", "set_line_actual", "create_budget", "update_budget", "delete_budget"];
+        ["set_starting_balance", "set_budget_actual", "set_line_actual", "create_budget", "update_budget", "delete_budget",
+            "create_line", "update_line", "end_line", "delete_line"];
 
     /// <summary>The input tools each view calls from its forms (literals too: renaming one must break the views).</summary>
     private static readonly Dictionary<string, string[]> InputToolsOfViews = new()
     {
         ["ui://finance/cash-flow-forecast.html"] = ["set_starting_balance"],
         ["ui://finance/month-overview.html"] = ["set_budget_actual", "set_line_actual"],
-        ["ui://finance/plan.html"] = ["create_budget", "update_budget", "delete_budget"],
+        ["ui://finance/plan.html"] = ["create_budget", "update_budget", "delete_budget", "create_line", "update_line", "end_line", "delete_line"],
     };
 
     public static TheoryData<string, string, string> ViewToolsViewsAndTitles =>
@@ -202,6 +203,20 @@ public partial class McpEndpointTests(McpServerFixture mcp)
         Assert.Equal(InputToolsOfViews.GetValueOrDefault(viewUri, []).Append(viewTool).Order(), mentioned.Order());
         Assert.Equal(["label", "previous", "month", "next", "status", "content"], pageIds);
         Assert.All(pageIds, id => Assert.Contains($"id=\"{id}\"", html));
+    }
+
+    [Fact]
+    public void ThePlanView_ExplainsTheRefusalsOfTheServer_InTheirExactTexts()
+    {
+        // REFUSALS in plan.ts finds a refusal by the text the server writes: a message changed on one side only would
+        // fall back on the general message, silently. The deletions are found by their first sentence.
+        var plan = File.ReadAllText(Path.Combine(ViewFixturesTests.ViewsProjectDirectory(), "src", "plan.ts"));
+        static string FirstSentence(string message) => message[..message.IndexOf(':', StringComparison.Ordinal)];
+
+        Assert.Contains($"\"{ToolErrors.LineNameTaken}\"", plan, StringComparison.Ordinal);
+        Assert.Contains($"\"{ToolErrors.BudgetNameTaken}\"", plan, StringComparison.Ordinal);
+        Assert.Contains($"\"{FirstSentence(ToolErrors.ActualsChanged)}\"", plan, StringComparison.Ordinal);
+        Assert.Contains($"\"{FirstSentence(ToolErrors.CorrectionsChanged)}\"", plan, StringComparison.Ordinal);
     }
 
     [Fact]

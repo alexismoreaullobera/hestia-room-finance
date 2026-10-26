@@ -37,8 +37,7 @@ public sealed class PlanBudgets(IEnumerable<Budget> budgets)
 
     private void EnsureNameFree(string name, Guid? except)
     {
-        // Ignoring case: "Courses" and "courses" would read as the same budget. Ordinal, never the culture of the server.
-        if (_budgets.Any(budget => budget.Id != except && string.Equals(budget.Name, name, StringComparison.OrdinalIgnoreCase)))
+        if (_budgets.Any(budget => budget.Id != except && Guard.IsSameName(budget.Name, name)))
         {
             throw new NameTakenException(nameof(name));
         }

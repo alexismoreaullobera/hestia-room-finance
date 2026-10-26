@@ -52,15 +52,17 @@ public class RecurringLinesOutputTests
     }
 
     [Fact]
-    public void Lines_OnTheSameDay_AreOrderedByName()
+    public void Lines_OnTheSameDay_AreOrderedByName_InFrench()
     {
         var output = RecurringLinesOutput.From(April2026(0m,
         [
             Monthly(FlowKind.Expense, "Forfait mobile", 12.99m, day: 8),
+            Monthly(FlowKind.Expense, "Épargne", 150m, day: 8),
             Monthly(FlowKind.Expense, "Box internet", 29.99m, day: 8),
         ]));
 
-        Assert.Equal(["Box internet", "Forfait mobile"], output.Lines.Select(l => l.Name));
+        // "Épargne" between "Box" and "Forfait": an ordinal order would put it last.
+        Assert.Equal(["Box internet", "Épargne", "Forfait mobile"], output.Lines.Select(l => l.Name));
     }
 
     [Theory]
@@ -87,8 +89,8 @@ public class RecurringLinesOutputTests
         var text = Output.Describe();
 
         Assert.StartsWith("Lignes récurrentes pour avril 2026.", text);
-        Assert.Contains($"Entrées : Salaire {2000m.ToString("C", French)} (mensuel, le 28/04)", text);
-        Assert.Contains($"Taxe {90m.ToString("C", French)} (trimestriel, pas ce mois-ci)", text);
+        Assert.Contains($"Entrées : « Salaire » {2000m.ToString("C", French)} (mensuel, le 28/04)", text);
+        Assert.Contains($"« Taxe » {90m.ToString("C", French)} (trimestriel, pas ce mois-ci)", text);
     }
 
     [Fact]

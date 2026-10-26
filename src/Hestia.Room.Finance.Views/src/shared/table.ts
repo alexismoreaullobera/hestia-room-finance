@@ -1,7 +1,9 @@
-// The editable tables of the views: one row per item, edited in place with a form of the kit, an optional deletion in
-// two steps and an optional row to add an item. Each input redraws the whole view from the result of the server.
+// The editable tables of the views: one row per item, edited in place with a form of the kit, optional other actions
+// with their own form (such as Terminer), an optional deletion in two steps and an optional row to add an item. Each
+// input redraws the whole view from the result of the server.
 import { element } from "./dom";
 import type { FormHandle } from "./form";
+import type { CallResult } from "./view";
 import "./table.css";
 
 /** How a form opened from a table closes: cancelled (the row given back), or saved (the view redrawn). */
@@ -14,8 +16,16 @@ export interface Closing {
 export interface RowRemoval {
   /** What the confirmation says, such as what goes with the item. */
   confirmation: string;
-  /** Calls the input tool that deletes; resolves to whether its result was shown. */
-  run: () => Promise<boolean>;
+  /** Calls the input tool that deletes; resolves as ViewContext.call does. */
+  run: () => Promise<CallResult>;
+}
+
+/** Another change of a row than Modifier, with its own form: such as Terminer, which asks for an end date. */
+export interface RowAction {
+  label: string;
+  /** The class of its button: the focus finds it again after a redraw, or when its form is cancelled. */
+  className: string;
+  form: (closing: Closing) => FormHandle;
 }
 
 /** What an editable row shows and how it is entered. */
@@ -26,6 +36,8 @@ export interface EditableRow {
   cells: () => HTMLElement[];
   /** The form that replaces the row, opened by Modifier. */
   form: (closing: Closing) => FormHandle;
+  /** Shown between Modifier and Supprimer. */
+  actions?: readonly RowAction[];
   remove?: RowRemoval;
 }
 
@@ -62,20 +74,29 @@ function wholeWidth(node: HTMLElement, columns: number, ...children: HTMLElement
 }
 
 /**
- * A row of an editable table: its cells, Modifier (the row turns into the form, on the whole width of the table) and,
- * when the item can be deleted, Supprimer (the row turns into a confirmation). Annuler or Escape gives the row back.
+ * A row of an editable table: its cells, Modifier (the row turns into the form, on the whole width of the table), its
+ * other actions (each with its form) and, when the item can be deleted, Supprimer (the row turns into a confirmation).
+ * Annuler or Escape gives the row back, the focus on the button that opened the form.
  */
-export function editableRow(table: string, columns: number, { key, cells, form, remove }: EditableRow): HTMLElement {
+export function editableRow(table: string, columns: number, { key, cells, form, actions = [], remove }: EditableRow): HTMLElement {
   const id = rowId(table, key);
   const node = element("tr", { attributes: { id } });
-  // After a save the view is redrawn, this row with it: the focus goes to the Modifier button of the same item, found by
+  // After a save the view is redrawn, this row with it: the focus goes to the same button of the same item, found by
   // its id (a rename may move it in the sorted list).
-  const afterShown = () => { document.getElementById(id)?.querySelector<HTMLElement>(".edit")?.focus(); };
+  const focusAfterShown = (className: string) => () => {
+    document.getElementById(id)?.querySelector<HTMLElement>(`.${className}`)?.focus();
+  };
 
-  function showValue(focus: "edit" | "remove" | null = null): void {
+  function showValue(focus: string | null = null): void {
     const edit = button("Modifier", "edit");
-    edit.addEventListener("click", showForm);
+    edit.addEventListener("click", () => { showForm(form, "edit"); });
     const buttons: HTMLElement[] = [edit];
+    for (const action of actions) {
+      // Its own class to find it again, the class of the kit for its style (never left to the browser).
+      const opener = button(action.label, `${action.className} row-action`);
+      opener.addEventListener("click", () => { showForm(action.form, action.className); });
+      buttons.push(opener);
+    }
     if (remove) {
       const removal = button("Supprimer", "remove");
       removal.addEventListener("click", () => { showConfirmation(remove); });
@@ -86,8 +107,9 @@ export function editableRow(table: string, columns: number, { key, cells, form, 
     if (focus) node.querySelector<HTMLButtonElement>(`.${focus}`)?.focus();
   }
 
-  function showForm(): void {
-    const { form: opened, focus } = form({ cancel: () => { showValue("edit"); }, afterShown });
+  /** The row turned into a form; its button (by class) takes the focus back on Annuler, and after a save. */
+  function showForm(open: (closing: Closing) => FormHandle, opener: string): void {
+    const { form: opened, focus } = open({ cancel: () => { showValue(opener); }, afterShown: focusAfterShown(opener) });
     node.classList.add("editing");
     wholeWidth(node, columns, opened);
     focus();
@@ -96,6 +118,7 @@ export function editableRow(table: string, columns: number, { key, cells, form, 
   function showConfirmation({ confirmation, run }: RowRemoval): void {
     const confirm = button("Confirmer la suppression", "confirm");
     const back = button("Annuler", "cancel");
+    const refusal = element("p", { className: "confirmation-error", attributes: { role: "alert" } });
     let busy = false;
     const setBusy = (value: boolean) => {
       busy = value;
@@ -104,13 +127,16 @@ export function editableRow(table: string, columns: number, { key, cells, form, 
     };
     confirm.addEventListener("click", () => {
       setBusy(true);
-      void run().then((shown) => {
+      refusal.textContent = "";
+      void run().then((result) => {
         // Deleted: the row is gone with the redraw, the focus goes to the button to add, if the table has one.
-        if (shown) {
+        if (result === true) {
           focusOn(`.${table} .new`);
           return;
         }
         setBusy(false);
+        // A refusal said here too: the status of the view may be out of sight, above a long table.
+        if (typeof result === "string") refusal.textContent = result;
         confirm.focus();
       });
     });
@@ -118,7 +144,8 @@ export function editableRow(table: string, columns: number, { key, cells, form, 
     node.classList.add("confirming");
     const cell = wholeWidth(node, columns,
       element("p", { className: "confirmation", attributes: { role: "alert" }, text: confirmation }),
-      element("div", { className: "actions" }, confirm, back));
+      element("div", { className: "actions" }, confirm, back),
+      refusal);
     // On the cell of the confirmation, gone with it: never a listener left on the row once the confirmation is closed.
     cell.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !busy) showValue("remove");

@@ -21,6 +21,41 @@ public sealed class FinancePlanReader(FinanceDbContext context)
             .Select(group => new { BudgetId = group.Key, Count = group.Count() })
             .ToDictionaryAsync(entry => entry.BudgetId, entry => entry.Count, cancellationToken);
 
+    /// <summary>
+    /// For each recurring line with overrides, the number of months they were entered for: what deleting it would also
+    /// delete. A line without any override is absent (0).
+    /// </summary>
+    public async Task<IReadOnlyDictionary<Guid, int>> CountOverridesByLineAsync(CancellationToken cancellationToken = default) =>
+        await context.RecurringOverrides.AsNoTracking()
+            .GroupBy(lineOverride => lineOverride.LineId)
+            .Select(group => new { LineId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(entry => entry.LineId, entry => entry.Count, cancellationToken);
+
+    /// <summary>
+    /// The whole plan, outside of any month: every budget and every recurring line, ended and future ones included. What
+    /// a change of the plan is checked against; the calculations of a month read <see cref="LoadMonthAsync"/>.
+    /// </summary>
+    public async Task<FinancePlan> LoadPlanAsync(CancellationToken cancellationToken = default)
+    {
+        var budgets = await context.Budgets.AsNoTracking().ToListAsync(cancellationToken);
+        var lines = await context.RecurringLines.AsNoTracking().ToListAsync(cancellationToken);
+
+        return new FinancePlan(budgets.Select(row => row.ToDomain()), lines.Select(row => row.ToDomain()));
+    }
+
+    /// <summary>
+    /// The recurring lines of the plan from a month on: those running during the month, and those starting after it
+    /// (a line saved for later stays in sight). Not those ended before the month.
+    /// </summary>
+    public async Task<IReadOnlyList<RecurringLine>> LoadLinesFromAsync(YearMonth month, CancellationToken cancellationToken = default)
+    {
+        var firstDay = month.FirstDay;
+        var rows = await context.RecurringLines.AsNoTracking()
+            .Where(line => line.EndDate == null || line.EndDate >= firstDay)
+            .ToListAsync(cancellationToken);
+        return [.. rows.Select(row => row.ToDomain())];
+    }
+
     public async Task<FinanceMonth> LoadMonthAsync(YearMonth month, CancellationToken cancellationToken = default)
     {
         var firstDay = month.FirstDay;

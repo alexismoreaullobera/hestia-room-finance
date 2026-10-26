@@ -29,6 +29,12 @@ internal static class Guard
     }
 
     /// <summary>
+    /// Two names of the plan read as the same one: ignoring case ("Courses" and "courses"), ordinal, never the culture of
+    /// the server. Accents count: "Épargne" and "Epargne" are two names.
+    /// </summary>
+    public static bool IsSameName(string name, string other) => string.Equals(name, other, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// A name the user typed: in its composed Unicode form (NFC: an accented letter typed as one character or as a letter
     /// and a combining accent is the same name), trimmed, not empty, at most <see cref="NameLimit.MaxLength"/>
     /// characters, with at least one visible character, and none of the characters that would break a line or hide text
