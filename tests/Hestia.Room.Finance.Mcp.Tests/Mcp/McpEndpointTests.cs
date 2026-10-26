@@ -37,7 +37,7 @@ public partial class McpEndpointTests(McpServerFixture mcp)
     {
         ["ui://finance/cash-flow-forecast.html"] = ["set_starting_balance"],
         ["ui://finance/month-overview.html"] = ["set_budget_actual", "set_line_actual"],
-        ["ui://finance/plan.html"] = ["create_budget", "update_budget", "delete_budget"],
+        ["ui://finance/plan.html"] = ["create_budget", "update_budget", "delete_budget", "create_line", "update_line", "end_line", "delete_line"],
     };
 
     public static TheoryData<string, string, string> ViewToolsViewsAndTitles =>

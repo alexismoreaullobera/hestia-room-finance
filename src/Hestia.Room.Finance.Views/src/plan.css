@@ -1,2 +1,22 @@
 /* The plan view: the editable tables of the kit (option A), and a note on what an edit changes. */
 .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+/* The form of a line: its fields side by side when the view is wide enough, the title and the buttons across. */
+.lines tr.editing .amount-form {
+  max-width: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  column-gap: 16px;
+}
+.lines tr.editing .amount-form > .title,
+.lines tr.editing .amount-form > .actions,
+.lines tr.editing .amount-form > .field-error { grid-column: 1 / -1; }
+/* A subscription among the lines: a badge, as the lines of the month overview. */
+.lines .badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
