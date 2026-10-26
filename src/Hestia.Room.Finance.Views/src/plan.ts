@@ -18,6 +18,20 @@ export const UPDATE_LINE = "update_line";
 export const END_LINE = "end_line";
 export const DELETE_LINE = "delete_line";
 
+/**
+ * The refusals of the input tools of the plan, as the server writes them (ToolErrors, checked equal by a C# test), and
+ * what the view says of each: some come from the server alone, the view seeing only the lines of the month and after.
+ */
+export const REFUSALS: readonly (readonly [server: string, view: string])[] = [
+  ["Another recurring line already has this name over the same period.",
+    "Une autre ligne porte déjà ce nom sur la même période, peut-être une ligne terminée avant ce mois."],
+  ["Another budget already has this name.", "Un autre budget porte déjà ce nom."],
+  ["The actuals of this budget changed since the confirmation",
+    "Des réels ont été saisis entre-temps : rien n'a été supprimé. Changez de mois puis revenez pour voir le plan à jour."],
+  ["The corrections of this line changed since the confirmation",
+    "Des corrections ont été saisies entre-temps : rien n'a été supprimé. Changez de mois puis revenez pour voir le plan à jour."],
+];
+
 /** The longest name the server accepts (NameLimit.MaxLength): checked here first, for a clear message. */
 const MAX_NAME_LENGTH = 100;
 
@@ -228,6 +242,7 @@ function linesTable({ month, lines }: PlanOutput, call: ViewContext["call"]): HT
 export const plan: ViewDefinition<PlanOutput> = {
   name: "Plan",
   tool: "show_plan",
+  explain: refusal => REFUSALS.find(([server]) => refusal.includes(server))?.[1] ?? null,
   render: (data, content, { call }) => {
     content.append(
       ...budgetsTable(data, call),

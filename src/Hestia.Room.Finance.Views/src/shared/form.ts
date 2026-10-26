@@ -3,13 +3,14 @@
 // forms all behave the same way.
 import { element } from "./dom";
 import { formatAmount, parseEuros } from "./format";
+import type { CallResult } from "./view";
 import "./form.css";
 
 /** Another way to answer than the fields, such as "Comme prévu" or "N'a pas eu lieu": a button with its own input call. */
 export interface FormAction {
   label: string;
-  /** Calls the input tool; resolves to whether its result was shown (see ViewContext.call). */
-  run: () => Promise<boolean>;
+  /** Calls the input tool; resolves as ViewContext.call does. */
+  run: () => Promise<CallResult>;
 }
 
 /** What a form sends: each value under the name of its field (null for a field not shown, or an optional one left empty). */
@@ -82,8 +83,8 @@ export interface FormOptions {
   fields: readonly Field[];
   /** A rule across the fields, checked once each field is valid on its own. */
   check?: (values: FormValues) => FormProblem | null;
-  /** Calls the input tool with the values typed; resolves to whether its result was shown. */
-  submit: (values: FormValues) => Promise<boolean>;
+  /** Calls the input tool with the values typed; resolves as ViewContext.call does. */
+  submit: (values: FormValues) => Promise<CallResult>;
   /** Closes the form without saving (Annuler, Escape). */
   cancel: () => void;
   actions?: readonly FormAction[];
@@ -252,15 +253,17 @@ export function recordForm({ title, fields, check, submit, cancel, actions = [],
     for (const control of controls) control.disabled = value;
   }
 
-  function send(call: () => Promise<boolean>): void {
+  function send(call: () => Promise<CallResult>): void {
     problem.textContent = "";
     setBusy(true);
-    void call().then((resultShown) => {
-      if (resultShown) {
+    void call().then((result) => {
+      if (result === true) {
         afterShown?.();
         return;
       }
       setBusy(false);
+      // A refusal said here too: the status of the view may be out of sight, above a long table.
+      if (typeof result === "string") problem.textContent = result;
       firstShown()?.focus();
     });
   }
@@ -321,8 +324,8 @@ export interface AmountFormOptions {
   label: string;
   /** The figure shown, prefilled (formatAmount, read back by parseEuros). */
   value: number;
-  /** Calls the input tool with the amount typed; resolves to whether its result was shown. */
-  submit: (amount: number) => Promise<boolean>;
+  /** Calls the input tool with the amount typed; resolves as ViewContext.call does. */
+  submit: (amount: number) => Promise<CallResult>;
   cancel: () => void;
   actions?: readonly FormAction[];
   afterShown?: () => void;

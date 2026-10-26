@@ -85,8 +85,7 @@ public sealed class FinancePlanInputTools
                 // Never more deleted than the confirmation said: an actual entered meanwhile (another view, another host)
                 // would go unseen with the budget.
                 if (!await writer.DeleteBudgetAsync(budgetId, actualsEntered, cancellationToken))
-                    throw new McpException("The actuals of this budget changed since the confirmation: nothing was deleted. "
-                        + "Show the plan again before deleting.");
+                    throw new McpException(ToolErrors.ActualsChanged);
             };
         }, cancellationToken);
 
@@ -197,8 +196,7 @@ public sealed class FinancePlanInputTools
             {
                 // Never more deleted than the confirmation said, as for a budget.
                 if (!await writer.DeleteLineAsync(lineId, overridesEntered, cancellationToken))
-                    throw new McpException("The corrections of this line changed since the confirmation: nothing was deleted. "
-                        + "Show the plan again before deleting.");
+                    throw new McpException(ToolErrors.CorrectionsChanged);
             };
         }, cancellationToken);
 

@@ -11,7 +11,7 @@ import forecastFixture from "./fixtures/cash-flow-forecast.json";
 import monthFixture from "./fixtures/month-overview.json";
 import subscriptionsFixture from "./fixtures/subscriptions.json";
 import planFixture from "./fixtures/plan.json";
-import { CREATE_BUDGET, CREATE_LINE, DELETE_BUDGET, DELETE_LINE, END_LINE, plan, UPDATE_BUDGET, UPDATE_LINE } from "../src/plan";
+import { CREATE_BUDGET, CREATE_LINE, DELETE_BUDGET, DELETE_LINE, END_LINE, plan, REFUSALS, UPDATE_BUDGET, UPDATE_LINE } from "../src/plan";
 import { startView } from "../src/shared/view";
 import { asHostApp, at, fakeApp, ManualResizeObserver, pageSkeleton, plain, toolResult } from "./helpers";
 
@@ -977,6 +977,17 @@ describe("plan, the recurring lines", () => {
 
     expect(lineRow(0).querySelector(".confirmation")?.textContent).toBe("Supprimer « Salaire » ?");
     expect(lineRow(1).querySelector(".confirmation")?.textContent).toBe("Supprimer « Loyer » ? Ses 3 corrections saisies seront aussi supprimées.");
+  });
+});
+
+describe("plan, the refusals of the server", () => {
+  it.each(REFUSALS.map(([server, view]) => [server, view]))("explains %j", (server, view) => {
+    // As the SDK writes a tool error: the message after a prefix of its own.
+    expect(plan.explain?.(`An error occurred invoking 'create_line': ${server}`)).toBe(view);
+  });
+
+  it("leaves any other refusal to the general message", () => {
+    expect(plan.explain?.("Invalid recurring line: expected a name of at most 100 characters.")).toBeNull();
   });
 });
 

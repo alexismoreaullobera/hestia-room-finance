@@ -206,6 +206,20 @@ public partial class McpEndpointTests(McpServerFixture mcp)
     }
 
     [Fact]
+    public void ThePlanView_ExplainsTheRefusalsOfTheServer_InTheirExactTexts()
+    {
+        // REFUSALS in plan.ts finds a refusal by the text the server writes: a message changed on one side only would
+        // fall back on the general message, silently. The deletions are found by their first sentence.
+        var plan = File.ReadAllText(Path.Combine(ViewFixturesTests.ViewsProjectDirectory(), "src", "plan.ts"));
+        static string FirstSentence(string message) => message[..message.IndexOf(':', StringComparison.Ordinal)];
+
+        Assert.Contains($"\"{ToolErrors.LineNameTaken}\"", plan, StringComparison.Ordinal);
+        Assert.Contains($"\"{ToolErrors.BudgetNameTaken}\"", plan, StringComparison.Ordinal);
+        Assert.Contains($"\"{FirstSentence(ToolErrors.ActualsChanged)}\"", plan, StringComparison.Ordinal);
+        Assert.Contains($"\"{FirstSentence(ToolErrors.CorrectionsChanged)}\"", plan, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ViewsOutputs_DeclareExactlyTheEnumsOfTheOutputs()
     {
         // The TypeScript unions of outputs.ts equal the domain enums; the views translate every value of the

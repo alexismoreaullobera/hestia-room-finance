@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { element } from "../src/shared/dom";
 import { recordForm, type FormValues } from "../src/shared/form";
 import { editableTable, type EditableRow, type NewRow, type RowAction } from "../src/shared/table";
+import type { CallResult } from "../src/shared/view";
 
 // The editable table of the kit with two items, the second one deletable, and a row to add an item.
 let page: HTMLElement;
@@ -13,8 +14,8 @@ beforeEach(() => {
 const pending = () => new Promise<boolean>(() => {});
 const items = ["Courses", "Sorties"];
 
-function render(options: { run?: () => Promise<boolean>; newRow?: NewRow | null; list?: string[]; actions?: RowAction[] } = {}) {
-  const run = options.run ?? vi.fn<() => Promise<boolean>>(pending);
+function render(options: { run?: () => Promise<CallResult>; newRow?: NewRow | null; list?: string[]; actions?: RowAction[] } = {}) {
+  const run = options.run ?? vi.fn<() => Promise<CallResult>>(pending);
   const rowOf = (name: string): EditableRow => ({
     key: name.toLowerCase(),
     cells: () => [element("td", { text: name })],
@@ -192,6 +193,17 @@ describe("editableTable", () => {
     expect(document.activeElement).toBe(buttonIn(row(1), "Confirmer la suppression"));
   });
 
+  it("says a refused deletion in the confirmation, the confirmation enabled again", async () => {
+    render({ run: () => Promise.resolve("Des corrections ont été saisies entre-temps.") });
+    buttonIn(row(1), "Supprimer").click();
+
+    buttonIn(row(1), "Confirmer la suppression").click();
+
+    await vi.waitFor(() => { expect(row(1).querySelector(".confirmation-error")?.textContent).toBe("Des corrections ont été saisies entre-temps."); });
+    expect(row(1).querySelector(".confirmation-error")?.getAttribute("role")).toBe("alert");
+    expect(buttonIn(row(1), "Confirmer la suppression").disabled).toBe(false);
+  });
+
   it("puts the focus on the button to add once the deletion is shown", async () => {
     render({ run: () => Promise.resolve(true) });
     buttonIn(row(1), "Supprimer").click();
@@ -204,7 +216,7 @@ describe("editableTable", () => {
 });
 
 describe("recordForm with several fields", () => {
-  function open(submit = vi.fn<(values: FormValues) => Promise<boolean>>(pending)) {
+  function open(submit = vi.fn<(values: FormValues) => Promise<CallResult>>(pending)) {
     const { form, focus } = recordForm({
       title: "Nouveau budget",
       fields: [
@@ -285,6 +297,31 @@ describe("recordForm with several fields", () => {
     expect(submit).not.toHaveBeenCalled();
     expect(page.querySelector(".field-error")?.textContent).toBe("La fin ne peut pas précéder le début.");
     expect(document.activeElement).toBe(inputs()[1]);
+  });
+
+  it("says a refusal of the server in the form, the values typed kept", async () => {
+    open(vi.fn<(values: FormValues) => Promise<CallResult>>(() => Promise.resolve("Un autre budget porte déjà ce nom.")));
+    inputs()[0]!.value = "Cadeaux";
+    inputs()[1]!.value = "40";
+
+    submitForm();
+
+    await vi.waitFor(() => { expect(page.querySelector(".field-error")?.textContent).toBe("Un autre budget porte déjà ce nom."); });
+    expect(inputs().map(input => [input.value, input.disabled])).toEqual([["Cadeaux", false], ["40", false]]);
+  });
+
+  it("clears the refusal of the server at the next sending", async () => {
+    let answer: string | boolean = "Refusé.";
+    open(vi.fn<(values: FormValues) => Promise<CallResult>>(() => Promise.resolve(answer)));
+    inputs()[0]!.value = "Cadeaux";
+    submitForm();
+    await vi.waitFor(() => { expect(page.querySelector(".field-error")?.textContent).toBe("Refusé."); });
+    answer = false;
+
+    submitForm();
+
+    await vi.waitFor(() => { expect(inputs()[0]!.disabled).toBe(false); });
+    expect(page.querySelector(".field-error")?.textContent).toBe("");
   });
 
   it("disables every field while sending", () => {

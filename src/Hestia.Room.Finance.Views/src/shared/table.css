@@ -37,4 +37,6 @@ button.new:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px
 button.confirm:disabled,
 button.cancel:disabled { opacity: .5; cursor: default; }
 .confirming .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.confirmation-error { color: var(--negative); font-size: 12px; margin: 6px 0 0; }
+.confirmation-error:empty { display: none; }
 tfoot tr.new-row td { border-top: 1px solid var(--line); }

@@ -3,6 +3,7 @@
 // input redraws the whole view from the result of the server.
 import { element } from "./dom";
 import type { FormHandle } from "./form";
+import type { CallResult } from "./view";
 import "./table.css";
 
 /** How a form opened from a table closes: cancelled (the row given back), or saved (the view redrawn). */
@@ -15,8 +16,8 @@ export interface Closing {
 export interface RowRemoval {
   /** What the confirmation says, such as what goes with the item. */
   confirmation: string;
-  /** Calls the input tool that deletes; resolves to whether its result was shown. */
-  run: () => Promise<boolean>;
+  /** Calls the input tool that deletes; resolves as ViewContext.call does. */
+  run: () => Promise<CallResult>;
 }
 
 /** Another change of a row than Modifier, with its own form: such as Terminer, which asks for an end date. */
@@ -117,6 +118,7 @@ export function editableRow(table: string, columns: number, { key, cells, form, 
   function showConfirmation({ confirmation, run }: RowRemoval): void {
     const confirm = button("Confirmer la suppression", "confirm");
     const back = button("Annuler", "cancel");
+    const refusal = element("p", { className: "confirmation-error", attributes: { role: "alert" } });
     let busy = false;
     const setBusy = (value: boolean) => {
       busy = value;
@@ -125,13 +127,16 @@ export function editableRow(table: string, columns: number, { key, cells, form, 
     };
     confirm.addEventListener("click", () => {
       setBusy(true);
-      void run().then((shown) => {
+      refusal.textContent = "";
+      void run().then((result) => {
         // Deleted: the row is gone with the redraw, the focus goes to the button to add, if the table has one.
-        if (shown) {
+        if (result === true) {
           focusOn(`.${table} .new`);
           return;
         }
         setBusy(false);
+        // A refusal said here too: the status of the view may be out of sight, above a long table.
+        if (typeof result === "string") refusal.textContent = result;
         confirm.focus();
       });
     });
@@ -139,7 +144,8 @@ export function editableRow(table: string, columns: number, { key, cells, form, 
     node.classList.add("confirming");
     const cell = wholeWidth(node, columns,
       element("p", { className: "confirmation", attributes: { role: "alert" }, text: confirmation }),
-      element("div", { className: "actions" }, confirm, back));
+      element("div", { className: "actions" }, confirm, back),
+      refusal);
     // On the cell of the confirmation, gone with it: never a listener left on the row once the confirmation is closed.
     cell.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !busy) showValue("remove");
