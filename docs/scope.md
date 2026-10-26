@@ -55,6 +55,8 @@ RecurringOverride
 - The occurrences of a recurring line in a month are **computed**, not stored.
 - A recurring line is considered **paid as planned** unless an override says otherwise; a budget without actual is considered **spent as planned**.
 - The budgets of a month are the ones passed to the calculation: a budget no longer used is simply not passed (no "active" flag in the domain).
+- A budget or a recurring line is changed for every month, past ones included: no versioning. A line that stops is **ended** on a date (its past stays); a change from a given month on is an end plus a new line. Deleting is for a mistake, and takes the actuals or corrections entered with it.
+- **Names**: two budgets never share a name, nor two recurring lines (ended ones included), ignoring case; a budget and a line may share one. A correction of a month where its line no longer falls due (after a change) is kept and ignored.
 - **Not stored**: bank details (IBAN, account numbers), individual transactions.
 
 ## Calculation rules
@@ -94,7 +96,7 @@ Every view tool also returns a **self-sufficient text summary** (model and voice
 |---|---|---|
 | **Data** (read-only) | `get_month_summary`, `get_cash_flow_forecast`, `list_recurring_lines`, `list_subscriptions`, `get_plan` (T11) | The agent |
 | **Views** | `show_month_overview`, `show_cash_flow_forecast`, `show_subscriptions`, `show_plan` (T11) | The agent and the hosts |
-| **Input** (`Visibility = App`) | `set_starting_balance` (T9); `set_budget_actual` and `set_line_actual`, the actuals of the month (T10); `create_budget`, `update_budget` and `delete_budget` in the plan view (T11); create / update / end / delete recurring lines and subscriptions (T12) | The widgets only, not the model |
+| **Input** (`Visibility = App`) | `set_starting_balance` (T9); `set_budget_actual` and `set_line_actual`, the actuals of the month (T10); `create_budget`, `update_budget` and `delete_budget` in the plan view (T11); `create_line`, `update_line`, `end_line` and `delete_line`, the recurring lines and subscriptions in the same view (T12) | The widgets only, not the model |
 
 The agent has **no write access** in the v1. The visibility only asks the MCP Apps hosts to hide the input tools from the model (a host without MCP Apps support offers them to its model): it is not access control (authentication before any deployment, see #2).
 
