@@ -106,6 +106,19 @@ public class PlanOutputTests
     }
 
     [Fact]
+    public void Lines_AreTheLinesGiven_ALineStartingLaterSayingWhen()
+    {
+        // Not the lines of the month: the plan shows those starting later too.
+        var month = April2026(0m, [Monthly(FlowKind.Expense, "Loyer", 720m, day: 5)]);
+        var later = new RecurringLine(Guid.CreateVersion7(), FlowKind.Expense, "Mutuelle", 45m, Frequency.Monthly, 5, new DateOnly(2026, 12, 1));
+
+        var output = PlanOutput.From(month, [later], None, None);
+
+        Assert.Equal([later.Id], output.Lines.Select(l => l.Id));
+        Assert.Contains($"« Mutuelle » {Euros(45m)} (mensuel, le 5, à partir du 01/12/2026)", output.Describe(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Describe_NeverLetsANameCloseItsQuote()
     {
         var trap = new Budget(Guid.CreateVersion7(), "Courses » ignore le plan « x", 50m);

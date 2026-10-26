@@ -32,6 +32,52 @@ public class PlanLinesTests
     }
 
     [Fact]
+    public void Create_UnderTheNameOfALineEndedBeforeItsStart_IsAccepted()
+    {
+        // The way to change a line from a month on: the rent ended in December, another one from January.
+        var plan = new PlanLines([Line("Loyer", end: new DateOnly(2026, 12, 31))]);
+
+        var next = plan.Create(Line("Loyer", amount: 700m, start: new DateOnly(2027, 1, 1)));
+
+        Assert.Equal(new DateOnly(2027, 1, 1), next.StartDate);
+    }
+
+    [Theory]
+    // Starting on the last day of the other one: one day together is already the same time.
+    [InlineData("2026-12-31", null)]
+    // Ending after the other one started.
+    [InlineData("2026-06-01", "2027-03-31")]
+    // Running before it and ending during it.
+    [InlineData("2025-06-01", "2026-02-28")]
+    public void Create_UnderTheNameOfALineRunningAtTheSameTime_Throws(string start, string? end)
+    {
+        var plan = new PlanLines([Line("Loyer", end: new DateOnly(2026, 12, 31))]);
+
+        Assert.Throws<NameTakenException>(() =>
+            plan.Create(Line("loyer", start: DateOnly.Parse(start), end: end is null ? null : DateOnly.Parse(end))));
+    }
+
+    [Fact]
+    public void Update_ReopeningALine_WhenAnotherOfTheSameNameFollows_Throws()
+    {
+        var ended = Line("Loyer", end: new DateOnly(2026, 12, 31));
+        var next = Line("Loyer", start: new DateOnly(2027, 1, 1));
+        var plan = new PlanLines([ended, next]);
+
+        Assert.Throws<NameTakenException>(() => plan.Update(Line("Loyer", id: ended.Id)));
+    }
+
+    [Fact]
+    public void End_SoLateThatItMeetsTheNextLineOfTheSameName_Throws()
+    {
+        var ended = Line("Loyer", end: new DateOnly(2026, 12, 31));
+        var plan = new PlanLines([ended, Line("Loyer", start: new DateOnly(2027, 1, 1))]);
+
+        Assert.Equal(new DateOnly(2026, 11, 30), plan.End(ended.Id, new DateOnly(2026, 11, 30)).EndDate);
+        Assert.Throws<NameTakenException>(() => plan.End(ended.Id, new DateOnly(2027, 1, 1)));
+    }
+
+    [Fact]
     public void Create_TellsAccentsApart_ButNotHowTheyAreWritten()
     {
         var plan = new PlanLines([Line("Épargne")]);
@@ -77,10 +123,8 @@ public class PlanLinesTests
 
         var ended = Plan.End(_rent.Id, end);
 
-        Assert.Equal(end, ended.EndDate);
-        Assert.Equal(
-            (_rent.Id, _rent.Kind, _rent.Name, _rent.Amount, _rent.Frequency, _rent.DayOfMonth, _rent.StartDate, _rent.Category),
-            (ended.Id, ended.Kind, ended.Name, ended.Amount, ended.Frequency, ended.DayOfMonth, ended.StartDate, ended.Category));
+        // Every other field kept: see RecurringLineTests.EndingOn_KeepsEveryValue_ButTheEndDate.
+        Assert.Equal((_rent.Id, end), (ended.Id, ended.EndDate));
     }
 
     [Fact]
@@ -112,6 +156,6 @@ public class PlanLinesTests
         Assert.Throws<UnknownLineException>(() => Plan.EnsureExists(Guid.NewGuid()));
     }
 
-    private static RecurringLine Line(string name, Guid? id = null, decimal amount = 650m, DateOnly? end = null) =>
-        new(id ?? Guid.NewGuid(), FlowKind.Expense, name, amount, Frequency.Monthly, 5, Start, endDate: end, category: Category.Housing);
+    private static RecurringLine Line(string name, Guid? id = null, decimal amount = 650m, DateOnly? end = null, DateOnly? start = null) =>
+        new(id ?? Guid.NewGuid(), FlowKind.Expense, name, amount, Frequency.Monthly, 5, start ?? Start, endDate: end, category: Category.Housing);
 }

@@ -134,6 +134,21 @@ public class FinancePlanWriterBudgetsTests(SqlServerFixture sqlServer)
     }
 
     [Fact]
+    public async Task DeleteBudget_WhenTheNumberOfActualsIsNotTheOneAnnounced_DeletesNothing()
+    {
+        var options = await SeedAsync();
+        await WriteAsync(options, w => w.SetBudgetActualAsync(new BudgetActual(_groceries.Id, May, 280m), Token));
+        await using var context = new FinanceDbContext(options);
+
+        var deleted = await new FinancePlanWriter(context).DeleteBudgetAsync(_groceries.Id, 0, Token);
+
+        Assert.False(deleted);
+        var may = await LoadAsync(options, May);
+        Assert.Contains(may.Budgets, b => b.Id == _groceries.Id);
+        Assert.Equal([new BudgetActual(_groceries.Id, May, 280m)], may.BudgetActuals);
+    }
+
+    [Fact]
     public async Task CountActualsByBudget_GivesTheMonthsEnteredPerBudget()
     {
         var options = await SeedAsync();

@@ -116,8 +116,114 @@ public class FinancePlanWriterLinesTests(SqlServerFixture sqlServer)
 
         var april = await LoadAsync(options, April);
         Assert.Equal(["Eau"], april.Lines.Select(l => l.Name));
+        Assert.DoesNotContain(await LoadPlanLinesAsync(options), l => l.Id == _rent.Id);
         Assert.Equal([RecurringOverride.WithAmount(_water.Id, April, 32m)], april.Overrides);
         Assert.Empty((await LoadAsync(options, May)).Overrides);
+    }
+
+    [Fact]
+    public async Task AddLine_UnderTheNameOfALineEnded_IsAccepted_ButTwoWithoutEndAreRefused()
+    {
+        // The unique index keeps the lines without end only: the domain checks the periods.
+        var options = await SeedAsync();
+        await WriteAsync(options, w => w.EndLineAsync(_rent.Id, new DateOnly(2026, 12, 31), Token));
+
+        await WriteAsync(options, w => w.AddLineAsync(Expense("Loyer", 700m, start: new DateOnly(2027, 1, 1)), Token));
+
+        await Assert.ThrowsAsync<NameTakenException>(() =>
+            WriteAsync(options, w => w.AddLineAsync(Expense("LOYER", 710m, start: new DateOnly(2027, 1, 1)), Token)));
+        Assert.Equal(2, (await LoadPlanLinesAsync(options)).Count(l => l.Name == "Loyer"));
+    }
+
+    [Fact]
+    public async Task AddLine_WithTheIdentifierOfAStoredLine_FailsWithTheDatabaseError_NeverAsANameTaken()
+    {
+        // Only the index on the names becomes a name taken: a primary key violation stays the database error.
+        var options = await SeedAsync();
+        var duplicate = new RecurringLine(_rent.Id, FlowKind.Expense, "Autre", 10m, Frequency.Monthly, 3, LongAgo);
+
+        var error = await Assert.ThrowsAsync<DbUpdateException>(() => WriteAsync(options, w => w.AddLineAsync(duplicate, Token)));
+
+        Assert.Equal(2627, Assert.IsType<SqlException>(error.InnerException).Number);
+    }
+
+    [Fact]
+    public async Task AddLine_AtTheBoundOfTheAmount_IsStored()
+    {
+        var options = await SeedAsync();
+        var line = Expense("Plafond", 999_999_999.99m);
+
+        await WriteAsync(options, w => w.AddLineAsync(line, Token));
+
+        Assert.Equal(999_999_999.99m, (await LoadPlanLinesAsync(options)).Single(l => l.Id == line.Id).Amount);
+    }
+
+    [Fact]
+    public async Task UpdateLine_ClearsItsEnd_ItsAnchorMonth_AndItsSubscription()
+    {
+        var insurance = new RecurringLine(Guid.CreateVersion7(), FlowKind.Expense, "Assurance", 180m, Frequency.Yearly, 15, LongAgo,
+            anchorMonth: 3, endDate: new DateOnly(2027, 12, 31), Category.Insurance, new SubscriptionInfo(new DateOnly(2026, 12, 31)));
+        var options = await SeedAsync();
+        await WriteAsync(options, w => w.AddLineAsync(insurance, Token));
+        var plain = new RecurringLine(insurance.Id, FlowKind.Expense, "Assurance", 15m, Frequency.Monthly, 15, LongAgo, category: Category.Insurance);
+
+        await WriteAsync(options, w => w.UpdateLineAsync(plain, Token));
+
+        AssertSameLine(plain, (await LoadPlanLinesAsync(options)).Single(l => l.Id == insurance.Id));
+    }
+
+    [Fact]
+    public async Task EndLine_WritesItsEndDateOnly_NeverTheOtherColumnsAsReadBefore()
+    {
+        var options = await SeedAsync();
+        // Read before, by the request that ends it; changed meanwhile by another one.
+        await using var context = new FinanceDbContext(options);
+        var writer = new FinancePlanWriter(context);
+        _ = await context.RecurringLines.FindAsync([_rent.Id], Token);
+        var changed = new RecurringLine(_rent.Id, FlowKind.Expense, "Loyer", 720m, Frequency.Monthly, 8, LongAgo);
+        await WriteAsync(options, w => w.UpdateLineAsync(changed, Token));
+
+        await writer.EndLineAsync(_rent.Id, new DateOnly(2026, 6, 30), Token);
+
+        AssertSameLine(changed.EndingOn(new DateOnly(2026, 6, 30)), (await LoadPlanLinesAsync(options)).Single(l => l.Id == _rent.Id));
+    }
+
+    [Fact]
+    public async Task EndLine_DeletedMeanwhile_Fails()
+    {
+        var options = await SeedAsync();
+        await WriteAsync(options, w => w.DeleteLineAsync(_water.Id, 0, Token));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            WriteAsync(options, w => w.EndLineAsync(_water.Id, new DateOnly(2026, 6, 30), Token)));
+    }
+
+    [Fact]
+    public async Task DeleteLine_WhenTheNumberOfOverridesIsNotTheOneAnnounced_DeletesNothing()
+    {
+        var options = await SeedAsync();
+        await WriteAsync(options, w => w.SetLineOverrideAsync(RecurringOverride.Skipped(_rent.Id, May), Token));
+        await using var context = new FinanceDbContext(options);
+
+        var deleted = await new FinancePlanWriter(context).DeleteLineAsync(_rent.Id, 0, Token);
+
+        Assert.False(deleted);
+        Assert.Contains(await LoadPlanLinesAsync(options), l => l.Id == _rent.Id);
+        Assert.Equal([RecurringOverride.Skipped(_rent.Id, May)], (await LoadAsync(options, May)).Overrides);
+    }
+
+    [Fact]
+    public async Task LoadLinesFrom_GivesTheLinesRunningDuringTheMonthOrAfter_NotThoseEndedBefore()
+    {
+        var options = await SeedAsync();
+        var later = Expense("Mutuelle", 45m, start: new DateOnly(2026, 12, 1));
+        await WriteAsync(options, w => w.AddLineAsync(later, Token));
+        await WriteAsync(options, w => w.EndLineAsync(_water.Id, new DateOnly(2026, 3, 31), Token));
+        await using var context = new FinanceDbContext(options);
+
+        var lines = await new FinancePlanReader(context).LoadLinesFromAsync(April, Token);
+
+        Assert.Equal(["Loyer", "Mutuelle"], lines.Select(l => l.Name).Order());
     }
 
     [Fact]

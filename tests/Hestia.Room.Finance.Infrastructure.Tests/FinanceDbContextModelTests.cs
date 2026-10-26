@@ -116,7 +116,8 @@ public class FinanceDbContextModelTests
 
     [Theory]
     [InlineData("CREATE UNIQUE INDEX [IX_Budgets_Name] ON [finance].[Budgets] ([Name])")]
-    [InlineData("CREATE UNIQUE INDEX [IX_RecurringLines_Name] ON [finance].[RecurringLines] ([Name])")]
+    // The lines without end only: two lines share a name one after the other (the domain checks the periods).
+    [InlineData("CREATE UNIQUE INDEX [IX_RecurringLines_Name] ON [finance].[RecurringLines] ([Name]) WHERE [EndDate] IS NULL;")]
     public void Names_AreUnique_InTheCreationScript(string index)
     {
         // The last resort of the rules of PlanBudgets and PlanLines: two budgets, or two lines, never share a name.

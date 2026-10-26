@@ -146,6 +146,70 @@ public class LineInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetime
         var deleted = await CallAsync("delete_line", new JsonObject { ["lineId"] = id, ["overridesEntered"] = 1 });
 
         Assert.DoesNotContain(deleted["structuredContent"]!["lines"]!.AsArray(), l => (string?)l!["id"] == id);
+        Assert.DoesNotContain($"override {id}", await WrittenRows.SnapshotAsync(mcp));
+    }
+
+    [Fact]
+    public async Task DeleteLine_WithoutCorrections_RemovesIt()
+    {
+        // The usual case: a line entered by mistake has no correction.
+        var id = await CreateAsync("Loyer");
+
+        var deleted = await CallAsync("delete_line", new JsonObject { ["lineId"] = id, ["overridesEntered"] = 0 });
+
+        Assert.DoesNotContain(deleted["structuredContent"]!["lines"]!.AsArray(), l => (string?)l!["id"] == id);
+        Assert.DoesNotContain($"line {id}", await WrittenRows.SnapshotAsync(mcp));
+    }
+
+    [Fact]
+    public async Task ALineChangedFromAMonthOn_IsAnEndThenANewLineOfTheSameName_BothInThePlan()
+    {
+        var old = await CreateAsync("Loyer");
+        await CallAsync("end_line", new JsonObject { ["lineId"] = old, ["endDate"] = "2031-12-31" });
+
+        var next = await CallAsync("create_line", Line($"{Prefix}Loyer", amount: 700m, start: "2032-01-01"));
+
+        // Seen from 2031-10: the line ended in December, and the next one, starting later.
+        var lines = next["structuredContent"]!["lines"]!.AsArray().Where(l => (string?)l!["name"] == $"{Prefix}Loyer").ToList();
+        Assert.Equal([("2031-01-01", 650m), ("2032-01-01", 700m)],
+            lines.Select(l => ((string)l!["startDate"]!, (decimal)l["amount"]!)).Order());
+    }
+
+    [Fact]
+    public async Task CreateLine_StartingAfterTheMonthShown_StaysInThePlan()
+    {
+        var created = await CallAsync("create_line", Line($"{Prefix}Mutuelle", start: "2031-12-01"));
+
+        Assert.Equal("2031-12-01", (string?)LineNamed(created, $"{Prefix}Mutuelle")["startDate"]);
+    }
+
+    [Fact]
+    public async Task ACorrection_IgnoredOnceItsLineEnded_CountsAgainWhenTheLineIsOpenAgain()
+    {
+        var id = await CreateAsync("Loyer");
+        await CallAsync("set_line_actual", new JsonObject { ["lineId"] = id, ["status"] = "Skipped" }, month: "2031-11");
+
+        var ended = await CallAsync("end_line", new JsonObject { ["lineId"] = id, ["endDate"] = "2031-10-31" });
+
+        // Kept: still counted for a delete, but not a line of November any more.
+        Assert.Equal(1, (int)LineNamed(ended, $"{Prefix}Loyer")["overridesEntered"]!);
+        Assert.DoesNotContain(await SummaryLinesAsync("2031-11"), l => (string?)l!["id"] == id);
+
+        await CallAsync("update_line", Line($"{Prefix}Loyer", id: id));
+
+        Assert.Equal("Skipped", (string?)(await SummaryLinesAsync("2031-11")).Single(l => (string?)l!["id"] == id)!["status"]);
+    }
+
+    private async Task<JsonArray> SummaryLinesAsync(string month) =>
+        (await _mcp.CallToolAsync("get_month_summary", new JsonObject { ["month"] = month }))["structuredContent"]!["lines"]!.AsArray();
+
+    [Fact]
+    public async Task CreateLine_WithAnInvalidDate_IsAToolError_NeverEchoingTheValue()
+    {
+        var result = await _mcp.CallToolAsync("create_line", WithMonth(Line($"{Prefix}Cadeaux", start: "not-a-date")));
+
+        Assert.True((bool?)result["isError"]);
+        Assert.DoesNotContain("not-a-date", Text(result));
     }
 
     [Fact]
@@ -190,7 +254,8 @@ public class LineInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetime
         { """{ "name": "DEMO" }""", "Another recurring line already has this name over the same period." },
         { """{ "amount": 0 }""", "Invalid recurring line" },
         { """{ "amount": 12.345 }""", "Invalid recurring line" },
-        { """{ "amount": 1000000000 }""", "Invalid recurring line" },
+        // The bound written invariantly, whatever the culture of the server.
+        { """{ "amount": 1000000000 }""", "999999999.99" },
         { """{ "dayOfMonth": 0 }""", "Invalid recurring line" },
         { """{ "dayOfMonth": 32 }""", "Invalid recurring line" },
         { """{ "anchorMonth": 3 }""", "Invalid recurring line" },
@@ -201,15 +266,13 @@ public class LineInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetime
         { """{ "commitmentEndDate": "2031-12-31" }""", "commitmentEndDate is for a subscription only." },
         { """{ "kind": 7 }""", "Invalid recurring line" },
         { """{ "month": "2031-13" }""", "YYYY-MM" },
-        { """{ "startDate": "not-a-date" }""", "An error occurred invoking 'create_line'." },
     };
 
     [Theory]
     [MemberData(nameof(InvalidLines))]
     public async Task CreateLine_Invalid_IsAToolError_AndWritesNothing(string changes, string expectedMessage)
     {
-        var demo = (string)(await _mcp.CallToolAsync("get_plan", MonthOnly()))["structuredContent"]!["lines"]!.AsArray()
-            .First(l => !((string)l!["name"]!).StartsWith(Prefix, StringComparison.Ordinal))!["name"]!;
+        var demo = await DemoLineNameAsync();
         var arguments = WithMonth(Line($"{Prefix}Cadeaux"));
         foreach (var (key, value) in JsonNode.Parse(changes)!.AsObject())
         {
@@ -255,8 +318,7 @@ public class LineInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetime
     public async Task InvalidCalls_AreToolErrors_AndWriteNothing(string tool, string changes, string expectedMessage)
     {
         var mine = await CreateAsync("Loyer");
-        var demo = (string)(await _mcp.CallToolAsync("get_plan", MonthOnly()))["structuredContent"]!["lines"]!.AsArray()
-            .First(l => !((string)l!["name"]!).StartsWith(Prefix, StringComparison.Ordinal))!["name"]!;
+        var demo = await DemoLineNameAsync();
         var arguments = tool == "update_line" ? WithMonth(Line($"{Prefix}Loyer", id: mine)) : new JsonObject { ["month"] = Month };
         foreach (var (key, value) in JsonNode.Parse(changes)!.AsObject())
         {
@@ -302,6 +364,11 @@ public class LineInputToolsEndpointTests(McpServerFixture mcp) : IAsyncLifetime
 
         return line;
     }
+
+    /// <summary>The name of a line of the demo, found by its identifier: a line without end, running in every month.</summary>
+    private async Task<string> DemoLineNameAsync() =>
+        (string)(await _mcp.CallToolAsync("get_plan", MonthOnly()))["structuredContent"]!["lines"]!.AsArray()
+            .First(l => mcp.DemoLineIds.Contains(Guid.Parse((string)l!["id"]!)))!["name"]!;
 
     /// <summary>Creates a monthly line named with the test prefix; returns its identifier.</summary>
     private async Task<string> CreateAsync(string name)

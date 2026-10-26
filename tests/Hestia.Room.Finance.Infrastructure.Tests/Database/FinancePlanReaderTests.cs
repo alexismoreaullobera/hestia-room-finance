@@ -36,6 +36,18 @@ public class FinancePlanReaderTests(SqlServerFixture sqlServer)
     }
 
     [Fact]
+    public async Task LoadLinesFrom_LeavesOutOnlyTheLinesEndedBeforeTheMonth()
+    {
+        var options = await SeedAsync();
+        await using var context = new FinanceDbContext(options);
+
+        var lines = await new FinancePlanReader(context).LoadLinesFromAsync(April, Token);
+
+        // Ending on April 1st still runs in April; starting in May is after it: both in sight.
+        Assert.Equal(["Loyer", "Piscine", "Presse", "Streaming"], lines.Select(l => l.Name).Order());
+    }
+
+    [Fact]
     public async Task LoadMonth_ReturnsTheLinesActiveDuringTheMonth()
     {
         var month = await LoadAprilAsync();
