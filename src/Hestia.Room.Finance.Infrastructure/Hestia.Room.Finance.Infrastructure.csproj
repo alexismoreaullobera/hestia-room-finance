@@ -17,7 +17,7 @@
     <!-- Transitive pinning: Microsoft.Data.SqlClient 6.1.7 brings System.Security.Cryptography.Pkcs 9.0.11,
          affected by CVE-2026-84008 (high) and CVE-2026-70162 (denial of service, fixed in 10.0.13).
          Remove once the SQL client depends on a patched version. -->
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="11.0.0" />
   </ItemGroup>
 
   <ItemGroup>
